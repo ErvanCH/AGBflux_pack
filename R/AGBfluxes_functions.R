@@ -433,44 +433,44 @@ corDBH <- function(DF,taper.correction,fill_missing) {
 				RESP <- which(grepl("R",DF$codes))
 				if (loc[1]!=min(RESP)) {
 					if(any(loc==1)) {
-						M <- matriDF(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-						M2 <- matriDF(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
+						M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+						M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
 					} else {
-						M <- matriDF(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-						M2 <- matriDF(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
+						M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+						M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
 					dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
 					hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
 
 					while(any(is.na(dbh2))) {
 						loc <- which(is.na(dbh2))
 						if(any(loc==1)) {
-							M <- matriDF(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-							M2 <- matriDF(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
+							M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+							M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
 						} else {
-							M <- matriDF(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-							M2 <- matriDF(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
+							M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+							M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
 						dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
 						hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
 					}
 				}}# end of resprout
 
 			if(any(loc==1)) {
-				M <- matriDF(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-				M2 <- matriDF(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
+				M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+				M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
 			} else {
-				M <- matriDF(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-				M2 <- matriDF(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
+				M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+				M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
 			dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
 			hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
 
 			while(any(is.na(dbh2))) {
 				loc <- which(is.na(dbh2))
 				if(any(loc==1)) {
-					M <- matriDF(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-					M2 <- matriDF(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
+					M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+					M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
 				} else {
-					M <- matriDF(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-					M2 <- matriDF(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
+					M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+					M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
 				dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
 				hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
 			}}# end of missing loop
@@ -479,7 +479,7 @@ corDBH <- function(DF,taper.correction,fill_missing) {
 		# Apply Cushman's correction to trees with POM changed
 		if (taper.correction & any(hom2 > 1.3)) {
 			ifelse(any(grepl("R",DF$codes)),ind1 <- 1:(grep("R",DF$codes)[1]-1),ind1 <-  which(DF$status!="D"))
-			dbh2[ind1] <- round(dbh2[ind1]*eDFp(0.0247*(hom2[ind1]-1.3)),1)
+			dbh2[ind1] <- round(dbh2[ind1]*exp(0.0247*(hom2[ind1]-1.3)),1)
 			# dbh2[DF$status=="D"] <- tail(dbh2[DF$status=="A" & !is.na(dbh2)],1)  # replicate last dbh to dead trees
 			hom2 <- rep(1.3,nrow(DF))
 		}}
@@ -502,6 +502,27 @@ LOAD <- function(saveFile) {
 	env[[loadedObjects]]
 }
 
+#' Assign status
+#' @author Ervan Rutishauser (er.rutishauser@gmail.com)
+#' @description Assign status alive ("A"), alive with POM changed ("AC"), dead ("D"), recruited ("R") or resprout ("Rsp") to trees, and check for consistency over time (i.e. avoid resurrection)
+#' @param DF a data.table
+#' @return update the column 'status1' with consistent information.
+#' @export
+assign.status <- function(DF) {
+	code <- rep("A",nrow(DF))
+	code[is.na(DF$dbh1) & DF$status1=="P"] <- "R"
+	code[is.na(DF$status1) & !is.na(DF$status2)] <- "Rsp"  # resprouted trees poses a problem only the first year, are alive/dead after
+	code[is.na(DF$dbhc2)] <- "D"
+	if(any(code=="A")){
+		loc <- max(which(code%in%c("A","Rsp")))
+		if (any(code[1:loc]=="D")) {
+			code[which(code[1:loc]=="D")] <- "A"
+		}}
+	dHOM <- DF$hom2 - DF$hom1
+	dHOM[is.na(dHOM)] <- 0
+	code[code=="A" & dHOM!=0] <- "AC" # trees with POM changed are not accounted for in productivity
+	return(list(code,dHOM))
+}
 
 #' Create quadrats
 #' @author Ervan Rutishauser (er.rutishauser@gmail.com)
@@ -512,13 +533,13 @@ LOAD <- function(saveFile) {
 #' @export
 
 create.quadrats=function(census,grid_size) {
-	X <- census[,grep("x",names(census)),with = FALSE]$gx
-	Y <- census[,grep("y",names(census)),with = FALSE]$gy
+	X <- census[,grep("x",names(census)),with = FALSE][[1]]
+	Y <- census[,grepl("y\\b",names(census)),with = FALSE][[1]]
 	if (any(is.na(X))){
 		warning(paste(length(X[is.na(X)])," trees without coordinates were discarded."))
 		census <- census[!is.na(X)]
-		X <- census[,grep("x",names(census)),with = FALSE]$gx
-		Y <- census[,grep("y",names(census)),with = FALSE]$gy
+		X <- census[,grep("x",names(census)),with = FALSE][[1]]
+		Y <- census[,grepl("y\\b",names(census)),with = FALSE][[1]]
 	}
 	minx=0
 	miny=0
