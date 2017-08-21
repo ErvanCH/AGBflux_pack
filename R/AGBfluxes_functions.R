@@ -4,7 +4,7 @@
 #' @param site provide the full name of your site (in lower case) i.e. 'barro colorado island'
 #' @param stem TRUE or FALSE, are you using the stem data (stem=TRUE) or tree data (i.e. called 'full')?
 #' @param taper.correction TRUE or FALSE, are you willing to apply Cushman et al (2014) taper correction?
-#' @param fill_missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
+#' @param fill.missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
 #' @param palm TRUE or FALSE, if TRUE, biomass of palm trees is computed through a specific allometric model (Goodman et al. 2013)
 #' @param strangler TRUE or FALSE, if TRUE, strangler figs tree are flagged (upon a list to published soon)
 #' @param maxrel a numeric value setting the threshold over which relative productivity is assumed to be too high (usually set at 20 percents)
@@ -15,7 +15,7 @@
 #' @return a data.table (data.frame) with all relevant variables.
 #' @export
 
-data.prep <- function(site,stem,taper.correction,fill_missing,palm,strangler,maxrel=20,draw.graph,output.errors,DATA_path,exclude.interval=exclude.interval) {
+data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,maxrel=20,draw.graph,output.errors,DATA_path,exclude.interval=exclude.interval) {
 	site <- tolower(site)
 	INDEX <- match(tolower(site),site.info$site)
 	if (is.na(INDEX)) {			stop("Site name should be one of the following: \n",paste(levels(factor(site.info$site)),collapse=" - ")) }
@@ -41,7 +41,7 @@ data.prep <- function(site,stem,taper.correction,fill_missing,palm,strangler,max
 	rm(temp)
 	df <- data.table(df[-1,])
 
-	df <- data.correction(df,taper.correction,fill_missing)
+	df <- data.correction(df,taper.correction,fill.missing)
 	print("Step 1: data correction done.")
 
 	df <- computeAGB(df,site,palm,DATA_path)
@@ -63,12 +63,12 @@ data.prep <- function(site,stem,taper.correction,fill_missing,palm,strangler,max
 #' @author Ervan Rutishauser (er.rutishauser@gmail.com)
 #' @description Stack all censuses together and correct DBH, if required
 #' @param taper.correction TRUE or FALSE, are you willing to apply Cushman et al (2014) taper correction?
-#' @param fill_missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
+#' @param fill.missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
 #' @return a data.table (data.frame) with all relevant variables.
 #' @export
 
-data.correction <- function(df,taper.correction,fill_missing) {
-	df <- df[!status%in%c("P"),] # discard all priors
+data.correction <- function(df,taper.correction,fill.missing) {
+	df <- df[!status%in%c("P","V"),] # discard all priors & vanished trees
 	df[,id :=paste(df$treeID,df$stemID,sep="-")] # creat a unique tree-stem ID
 	df <- df[order(id,CensusID)]
 	df[,status1:=normal.stat(.SD),by=id]
@@ -88,7 +88,7 @@ data.correction <- function(df,taper.correction,fill_missing) {
 	df <- df[!id%in%NO.MEASURE$treeID[NO.MEASURE$V1]] # remove stems without any measure
 
 	# Taper correction or missing values: -> fill gaps for missing values
-	df[, c("dbh2","hom2") := corDBH(.SD,taper.correction=taper.correction,fill_missing=fill_missing), by=id] # might be time consuming (4 minutes for BCI)
+	df[, c("dbh2","hom2") := corDBH(.SD,taper.correction=taper.correction,fill.missing=fill.missing), by=id] # might be time consuming (4 minutes for BCI)
 	table(is.na(df$dbh2),df$status1)
 	NO.MEASURE <- df[,all(is.na(dbh2)),by=treeID]
 	table(NO.MEASURE$V1)
@@ -187,7 +187,6 @@ format.interval <- function(df,strangler) {
 	DF <- within(DF,date1[is.na(date1)] <- DATE$date1[match(DF[is.na(date1),"year"]$year,DATE$year)])
 	DF$int <- (DF$date2 - DF$date1)/365.5  # census interval in days
 
-
 	# Update status for recruited trees
 	DF[, nrow := seq_len(.N), by = treeID]
 	DF <- within(DF,status1[is.na(status1) & !is.na(dbh2) & nrow==1] <- "P")  # recruited trees or Z code (=?)
@@ -205,9 +204,10 @@ format.interval <- function(df,strangler) {
 	# Compute annualized fluxes
 	DF[code%in%c("A","AC"),prod.g := (agb2-agb1)/int,by=treeID] # annual prod for alive trees
 	DF[code%in%c("R","Rsp"),prod.r:=agb2/int,by=treeID] # annual prod for resprouts and recruits
+	DF[code=="D",agbl:= agb1,]
 	DF[,loss:=agbl/int,by=treeID] # annualized loss for dead trees
-	DF[code=="D",loss2:=agb1/int,by=treeID]
-	# DF[,.(prod.g=mean(prod.g,na.rm=T),prod.r=mean(prod.r,na.rm=T),loss=mean(loss,na.rm=T),agbl=mean(agbl,na.rm=T)),by=code]
+	
+
 	# Flag strangler figs
 	if(strangler) {
 		DF$ficus <- 0
@@ -298,24 +298,6 @@ determine.mean.prod <- function(DF,site,strangler,exclude.interval) {
 	return(mPROD)
 }
 
-#' CTFS-formated data preparation
-#' @author Ervan Rutishauser (er.rutishauser@gmail.com)
-#' @description Main routine to format and correct CTFS-formated data
-#' @param site provide the full name of your site (in lower case) i.e. 'barro colorado island'
-#' @param stem TRUE or FALSE, are you using the stem data (stem=TRUE) or tree data (i.e. called 'full')?
-#' @param taper.correction TRUE or FALSE, are you willing to apply Cushman et al (2014) taper correction?
-#' @param fill_missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
-#' @param palm TRUE or FALSE, if TRUE, biomass of palm trees is computed through a specific allometric model (Goodman et al. 2013)
-#' @param strangler TRUE or FALSE, if TRUE, strangler figs tree are flagged (upon a list to published soon)
-#' @param maxrel a numeric value setting the threshold over which relative productivity is assumed to be too high (usually set at 20 percents)
-#' @param draw.graph TRUE or FALSE, if TRUE, draw graph for trees with 'erroneous' DBH measures/productivity
-#' @param output.errors TRUE or FALSE, if TRUE, creat a CSV file with all trees with erroneous DBH measures/productivity
-#' @param DATA_path allows to provide a different path where the data are located
-#' @param exclude.interval a vector (i.e. c(1,2)) indicating if a set of census intervals must be discarded from computation due for instance to a change in  protocol of measurment
-#' @return a data.table (data.frame) with all relevant variables.
-#' @export
-
-
 #' Loess
 #' @author Ervan Rutishauser (er.rutishauser@gmail.com)
 #' @description a wrapper to get smoothed predictions of AGB fluxes using a loess function (library 'locfit')
@@ -324,10 +306,10 @@ determine.mean.prod <- function(DF,site,strangler,exclude.interval) {
 #' @param range the range of initial AGB to be used for prediction (i.e. 5th and 95th percentiles of the whole distribution)
 #' @return a smoothed prediction of the variable of interest
 #' @export
-loess.function <- function(x,var,range)  {
+loess.fun <- function(x,var,range)  {
 	fit <- locfit(var ~ lAGB, data=x)
 	pred <- predict(fit,newdata=list(lAGB=range))
-	return(as.numeric(pred))
+	return(data.frame(lAGB=range,y=as.numeric(pred)))
 }
 
 #' Normalized tree status
@@ -341,14 +323,15 @@ normal.stat <-function(X) {
 	STAT <- X$status
 	if (any(is.na(X$dbh))|any(grep("D",X$status))) {
 		locA <- which(X$status=="A" & !is.na(X$dbh))
-		if (length(locA)!=0) {
-			if(any(grep("D",STAT[1:min(locA)]))) {
-				STAT[is.na(X$dbh)][1:min(locA)-1] <- "P" }
-			if(any(grep("D",STAT[min(locA):max(locA)]))) { #
-				STAT[min(locA):max(locA)] <- "A" }
-			if (all(is.na(X$dbh[(max(locA)+1):nrow(X)]))) {
-				STAT[(max(locA)+1):nrow(X)] <- "D" }
-		}
+			if (length(locA)!=0) {
+				if(any(grep("D",STAT[1:min(locA)]))) {
+					STAT[is.na(X$dbh)][1:min(locA)-1] <- "P" }
+				if(any(grep("D",STAT[min(locA):max(locA)]))) { #
+					STAT[min(locA):max(locA)] <- "A" }
+				if (all(is.na(X$dbh[(max(locA)+1):nrow(X)]))) {
+					STAT[(max(locA)+1):nrow(X)] <- "D" }
+			}
+		STAT[X$status=="V"]<- "V"
 	}
 	return(STAT)
 }
@@ -417,17 +400,17 @@ AGB.comp <- function (site,D,WD, H = NULL) {
 #' @description Perform two mains tasks: (a) apply a taper correction when POM is > 130 cm, and (b) linear interpolation values when missing DBHs. Interpolation of missing values is done by averaging surrounding available DBH values.
 #' @param DF a data.table
 #' @param taper.correction TRUE or FALSE, are you willing to apply Cushman et al (2014) taper correction?
-#' @param fill_missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
+#' @param fill.missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
 #' @return a data.table (data.frame) with all relevant variables.
 #' @export
 
 # Correction of DBH
-corDBH <- function(DF,taper.correction,fill_missing) {
+corDBH <- function(DF,taper.correction,fill.missing) {
 	hom2 <-  round(as.numeric(DF$hom)*100)/100
 	dbh2 <-  DF$dbh
 
 	if (!all(is.na(dbh2))) { # if all DBH are NA -> can't do much -> much be discarded
-		if (fill_missing & any(is.na(dbh2)))  { # Feel gap for missing DBH with average between prior and neDFt census
+		if (fill.missing & any(is.na(dbh2)))  { # Feel gap for missing DBH with average between prior and neDFt census
 			loc <- which(is.na(dbh2))
 			if (any(grepl("R",DF$codes))) { # avoid resprouts
 				RESP <- which(grepl("R",DF$codes))
