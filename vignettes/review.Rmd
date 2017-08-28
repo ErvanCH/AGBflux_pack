@@ -32,7 +32,12 @@ knitr::opts_chunk$set(
 options(dplyr.print_min = 6, dplyr.print_max = 6)
 ```
 
+I wrote this review as a vignette. When you are done reading it, you can remove it simply by deleting `vignettes/`.
 
+
+
+
+# Installation
 
 ```{r}
 library(devtools)
@@ -44,7 +49,7 @@ Installs OK.
 install_github("ervanSTRI/AGBflux_pack")
 ```
 
-# Try to learn what the package does
+# Goal
 
 * Searching for documentation at the package level:
 
@@ -67,11 +72,10 @@ Now jumping to the source code to see if there is a man/ folder with documentati
 
 Yes, there is documentation.
 
-```{r}
+```
 ?AGB.comp
 ?flag.errors
 ?LOAD
-
 ```
 
 
@@ -122,11 +126,25 @@ Do not distribute outside of Widgets Incorporated.
 
 This information helps you solve a number of issues. I'll mention a couple of important ones. You'll be able to work out the rest. (If the information is unclear, you may find more details here; http://r-pkgs.had.co.nz/check.html)
 
-In the documentation of some function, some parameters that those functions use remain undocumented. One good way to not any important piece of documentation is to step on the function's name and press Ctrl + Shift + Alt + R. That will automatically write the roxygen skeleton of key documentation inluding all parameters. If you need to use the same  parameter in multiple functions, you may avoid duplicating its documentation with @template.
+In the documentation of some function, some parameters that those functions use remain undocumented. One good way to not any important piece of documentation is to step on the function's name and press Ctrl + Shift + Alt + R. That will automatically write the roxygen skeleton of key documentation inluding all parameters. If you need to use the same  parameter in multiple functions, you may avoid duplicating its documentation with [@template](https://cran.r-project.org/web/packages/roxygen2/vignettes/rd.html).
 
 Also, you need to rename sume functions. For example, if you rename  `density.ind()` as `density_ind()` you will avoid R thinking that `density.ind()` is an S3 method of the generic function `density()` (http://adv-r.had.co.nz/OO-essentials.html#s3). Again, that is why it is safer to avoid "." in function names, unless you intend to wirite an S3 object.
 
 
+
+
+
+
+# Tests
+
+You are already testing, but in a non-systematic way: you write a function, run it, and see its output  on the console to check check if it's right. If do this systematically, with an automatic unit testing system such as the __[testthat](https://cran.r-project.org/web/packages/testthat/testthat.pdf)__ package, you will save you a lot of time. This type of test is for you, the developer. 
+
+Another type of test are assertions, which you can implement with e.g. the __[assertive](https://cran.r-project.org/web/packages/assertive/assertive.pdf)__ package. Assertions target not the developer but the user; they err, warn of give messages to the user when something is wrong or suspicious. 
+
+This are good resources to learn more about unit tests and assertions:
+
+* http://r-pkgs.had.co.nz/tests.html
+* [Testing R code, by Richard Cotton](https://www.crcpress.com/Testing-R-Code/Cotton/p/book/9781498763653).
 
 
 
