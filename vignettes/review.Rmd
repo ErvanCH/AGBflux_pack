@@ -1,0 +1,165 @@
+---
+title: "Review"
+author: "Mauro Lepore"
+date: "2017-08-28"
+output: 
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 6
+vignette: >
+  %\VignetteIndexEntry{Review}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, echo = FALSE, message=FALSE, warning=FALSE}
+# hadley's settings
+set.seed(1014)
+options(digits = 3)
+
+knitr::opts_chunk$set(
+  echo = TRUE,  # {mine}
+  comment = "#>",
+  collapse = TRUE,
+  # cache = TRUE,
+  out.width = "70%",
+  fig.align = "center",
+  fig.width = 6,
+  fig.asp = 0.618,  # 1 / phi
+  fig.show = "hold"
+)
+
+options(dplyr.print_min = 6, dplyr.print_max = 6)
+```
+
+
+
+```{r}
+library(devtools)
+```
+
+Installs OK.
+
+```{r}
+install_github("ervanSTRI/AGBflux_pack")
+```
+
+# Try to learn what the package does
+
+* Searching for documentation at the package level:
+
+```{r}
+library(AGBfluxes)
+?AGBflux_pack
+```
+
+Needs package documentation (http://r-pkgs.had.co.nz/man.html#man-packages)
+
+
+
+* Searching for help file of any function:
+
+    * Typing on the console `AGBflux_pack::` + tab: Nothing pops up. 
+    
+I'm wondering if the package has any function which help file is available.
+
+Now jumping to the source code to see if there is a man/ folder with documentation.
+
+Yes, there is documentation.
+
+```{r}
+?AGB.comp
+?flag.errors
+?LOAD
+
+```
+
+
+
+# Checks
+
+Run `devtools::check()` (find "Check" in the Build tab) and address errors, warnings and notes.
+
+![](https://i.imgur.com/yYzv7W0.png)
+
+
+## Notes
+
+The DESCRIPTON file  has a problem:
+
+```
+checking DESCRIPTION meta-information ... NOTE
+Malformed Title field: should not end in a period.
+```
+
+To solve it, remove the period at the end of the sentence you wrote on the Title field. Also consider this (http://r-pkgs.had.co.nz/description.html)
+
+    * shorten the sentence to 80 characters or less.
+    * use Title Type Capitalization
+
+Also, the Licence field has a problem:
+
+```
+Non-standard license specification:
+  What license is it under?
+Standardizable: FALSE
+```
+
+This should guide you to solve it:
+
+> The License field can be either a standard abbreviation for an open source license, like GPL-2 or BSD, or a pointer to a file containing more information, file LICENSE. The license is really only important if you're planning on releasing your package. If you don't, you can ignore this section. If you want to make it clear that your package is not open source, use License: file LICENSE and then create a file called LICENSE, containing for example:
+
+```
+Proprietary 
+
+Do not distribute outside of Widgets Incorporated.
+```
+
+--http://r-pkgs.had.co.nz/description.html
+
+
+## Warnings
+
+This information helps you solve a number of issues. I'll mention a couple of important ones. You'll be able to work out the rest. (If the information is unclear, you may find more details here; http://r-pkgs.had.co.nz/check.html)
+
+In the documentation of some function, some parameters that those functions use remain undocumented. One good way to not any important piece of documentation is to step on the function's name and press Ctrl + Shift + Alt + R. That will automatically write the roxygen skeleton of key documentation inluding all parameters. If you need to use the same  parameter in multiple functions, you may avoid duplicating its documentation with @template.
+
+Also, you need to rename sume functions. For example, if you rename  `density.ind()` as `density_ind()` you will avoid R thinking that `density.ind()` is an S3 method of the generic function `density()` (http://adv-r.had.co.nz/OO-essentials.html#s3). Again, that is why it is safer to avoid "." in function names, unless you intend to wirite an S3 object.
+
+
+
+
+
+# Author
+
+If the author of the package is the author of a function, then that author needs not to be explicitely mentioned in each help file. 
+
+In other words, use \@author in help files of functions written but people other than the authors of the package.
+
+
+
+
+# Style
+
+Use a style guide, e.g. 
+
+* http://style.tidyverse.org/ (the one I use).
+* https://google.github.io/styleguide/Rguide.xml.
+
+> Variable and function names should use only lowercase letters, numbers, and _.
+
+> Use underscores (_) to separate words within a name. Base R uses dots in function names (contrib.url()) and class names (data.frame), but it’s better to reserve dots exclusively for the S3 object system. In S3, methods are given the name function.class; if you also use . in function and class names you end up with confusing methods like as.data.frame.data.frame().
+
+--http://style.tidyverse.org/syntax.html#object-names
+
+```
+i_use_snake_case
+otherPeopleUseCamelCase
+some.people.use.periods
+And_aFew.People_RENOUNCEconvention
+```
+
+--http://r4ds.had.co.nz/workflow-basics.html#whats-in-a-name
+
+
+
