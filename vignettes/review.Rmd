@@ -148,7 +148,34 @@ This are good resources to learn more about unit tests and assertions:
 
 
 
-# Author
+# File DESCRIPTON
+
+Fields and comments:
+
+* `Type:` I'm not sure what this field does.
+* `Version:` Consider using a development version until released. The book _R Packages_ recommends adding .9000 to the end of a development verison number to clearly indicate it is not a released version.
+* Author`and `Maintainer`: Both fields can be documented with `person()` (see `?person`). `person()` also offers other potentially useful roles.
+
+
+
+# Functions
+
+* Grouping: Consider grouping functions in files by topic.
+* Tab versus space: Avoid using tab to insert spaces. Instead use space.
+* Lines width: Keep the widh of each line no longer than 80 characters. This improves readability. To achive this:
+
+  * Guide your eyes setting a margin column marker: Tools > Global Options > Code > Display > Show Margin > Margin Column = 80.
+  
+  * For comments (both normal and roxygen comments), master the keyboard shortcuts Shift + Control + C to comment a line/paragraph, and Shift + Control + / to brake a paragraph into lines no longer than 80 characters.
+
+* Use a style guide (see section Style) and reformat the code with (select then) Control + Shift + A, or  `formatR::tidy_code()`.
+
+* Check the style of your package with the __lintr__ package. Also see `goodpractice::gp()`.
+  
+
+
+
+## Author
 
 If the author of the package is the author of a function, then that author needs not to be explicitely mentioned in each help file. 
 
