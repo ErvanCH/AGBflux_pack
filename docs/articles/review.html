@@ -68,7 +68,7 @@
 <span class="co">#&gt; Installing AGBfluxes</span>
 <span class="co">#&gt; "C:/PROGRA~1/R/R-34~1.1/bin/x64/R" --no-site-file --no-environ --no-save  \</span>
 <span class="co">#&gt;   --no-restore --quiet CMD INSTALL  \</span>
-<span class="co">#&gt;   "C:/Users/dora/AppData/Local/Temp/RtmpgpoabO/devtools39305ad96126/ervanSTRI-AGBflux_pack-8fc882b"  \</span>
+<span class="co">#&gt;   "C:/Users/dora/AppData/Local/Temp/RtmpENFIGF/devtools3d1c711a1ec8/ervanSTRI-AGBflux_pack-8fc882b"  \</span>
 <span class="co">#&gt;   --library="C:/Users/dora/Documents/R/win-library/3.4" --install-tests</span>
 <span class="co">#&gt; </span></code></pre></div>
 </div>
@@ -237,10 +237,35 @@ And_aFew.People_RENOUNCEconvention</code></pre>
 <li><p>Once you are confident of the checks you do locally, you may want to use continuous integration. For example with TravisCI (see <code>devtools::use_travis()</code>).</p></li>
 </ul>
 </div>
+<div id="readme" class="section level1">
+<h1 class="hasAnchor">
+<a href="#readme" class="anchor"></a>README</h1>
+<p>Add a README file with <code>devtools::use_readme_rmd()</code>. This file will be the Home of the package website.</p>
+</div>
+<div id="package-infrasctructure" class="section level1">
+<h1 class="hasAnchor">
+<a href="#package-infrasctructure" class="anchor"></a>Package infrasctructure</h1>
+<p>See <code>?devtools::infrastructure</code>. Here are a number of functins that will be handy to improve your package. The ones I commonly use are these:</p>
+<pre><code>library(devtools)
+
+# Tests and checks
+use_testthat(pkg = ".")
+use_test(name, pkg = ".")
+use_travis(pkg = ".", browse = interactive())
+use_coverage(pkg = ".", type = c("codecov", "coveralls"))
+
+# Documentation
+use_package_doc(pkg = ".")
+use_vignette(name, pkg = ".")
+
+# Edits DESCRIPTION
+use_dev_version(pkg = ".")
+use_gpl3_license(pkg = ".")</code></pre>
+</div>
 <div id="website" class="section level1">
 <h1 class="hasAnchor">
 <a href="#website" class="anchor"></a>Website</h1>
-<p>You can make a website for your package with <code>pkgdown::build_site()</code>. Now, the website fails to build because the file DESCRIPTION has somme issues.</p>
+<p>You can make a website for your package with <code>pkgdown::build_site()</code>. I made one (see folder docs/) which you can host on GitHub (Settings &gt; GitHubPages &gt; Source &gt; master branch /docs folder). But you’d want to update the website often to incorporate the latests features of your package.</p>
 </div>
 </div>
   </div>
@@ -267,6 +292,8 @@ And_aFew.People_RENOUNCEconvention</code></pre>
       <li><a href="#style">Style</a></li>
       <li><a href="#data">Data</a></li>
       <li><a href="#other-things-to-start-thinking-about">Other things to start thinking about</a></li>
+      <li><a href="#readme">README</a></li>
+      <li><a href="#package-infrasctructure">Package infrasctructure</a></li>
       <li><a href="#website">Website</a></li>
       </ul>
 </div>

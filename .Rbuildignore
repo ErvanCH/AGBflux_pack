@@ -2,3 +2,5 @@
 ^\.Rproj\.user$
 ^docs/$
 ^revdep$
+^README\.Rmd$
+^README-.*\.png$
