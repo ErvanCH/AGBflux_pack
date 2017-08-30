@@ -1,9 +1,8 @@
 Package: AGBfluxes
-Type: Package
 Title: Set of functions to format, correct and compute AGB fluxes from CTFS-formated data.
-Version: 0.1
-Author: Ervan Rutishauser <er.rutishauser@gmail.com>
-Maintainer: Ervan Rutishauser <er.rutishauser@gmail.com>
+Version: 0.0.9000
+Authors@R: c(person("Ervan", "Rutishauser", , "er.rutishauser@gmail.com", 
+    role = c("aut", "ctr", "cre")))
 Description: More about what it does (maybe more than one line)
     Use four spaces when indenting paragraphs within the Description.
 License: What license is it under?
@@ -14,3 +13,5 @@ Suggests: knitr,
     rmarkdown,
     testthat
 VignetteBuilder: knitr
+
+

@@ -259,6 +259,40 @@ You usually need some data, even dummy data, for examples and tests. See `devtoo
 
 * Once you are confident of the checks you do locally, you may want to use continuous integration. For example with TravisCI (see `devtools::use_travis()`).
 
+
+
+
+# README
+
+Add a README file with `devtools::use_readme_rmd()`. This file will be the Home of the package website.
+
+
+
+# Package infrasctructure
+
+See `?devtools::infrastructure`. Here are a number of functins that will be handy to improve your package. The ones I commonly use are these:
+
+```
+library(devtools)
+
+# Tests and checks
+use_testthat(pkg = ".")
+use_test(name, pkg = ".")
+use_travis(pkg = ".", browse = interactive())
+use_coverage(pkg = ".", type = c("codecov", "coveralls"))
+
+# Documentation
+use_package_doc(pkg = ".")
+use_vignette(name, pkg = ".")
+
+# Edits DESCRIPTION
+use_dev_version(pkg = ".")
+use_gpl3_license(pkg = ".")
+```
+
+
+
 # Website 
 
-You can make a website for your package with `pkgdown::build_site()`. Now, the website fails to build because the file DESCRIPTION has somme issues. 
+You can make a website for your package with `pkgdown::build_site()`. I made one (see folder docs/) which you can host on GitHub (Settings > GitHubPages > Source > master branch /docs folder). But you'd want to update the website often to incorporate the latests features of your package.
+
