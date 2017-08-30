@@ -258,3 +258,7 @@ You usually need some data, even dummy data, for examples and tests. See `devtoo
 * Once you are using automated unit tests, you may want to measuere code cover. For example with the  __covr__ package (see `devtools::use_coverage()`).
 
 * Once you are confident of the checks you do locally, you may want to use continuous integration. For example with TravisCI (see `devtools::use_travis()`).
+
+# Website 
+
+You can make a website for your package with `pkgdown::build_site()`. Now, the website fails to build because the file DESCRIPTION has somme issues. 
