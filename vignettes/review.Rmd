@@ -32,7 +32,7 @@ knitr::opts_chunk$set(
 options(dplyr.print_min = 6, dplyr.print_max = 6)
 ```
 
-I wrote this review as a vignette. When you are done reading it, you can remove it simply by deleting `vignettes/`.
+I wrote this review as a vignette in your  package. When you are done reading it, you can remove it simply by deleting `vignettes/`.
 
 
 
@@ -137,9 +137,46 @@ Also, you need to rename sume functions. For example, if you rename  `density.in
 
 # Tests
 
-You are already testing, but in a non-systematic way: you write a function, run it, and see its output  on the console to check check if it's right. If do this systematically, with an automatic unit testing system such as the __[testthat](https://cran.r-project.org/web/packages/testthat/testthat.pdf)__ package, you will save you a lot of time. This type of test is for you, the developer. 
+You are already testing, but in a non-systematic way: you write a function, run it, and see its output  on the console to check check if it's right. You, the developer, will save you a lot of time if you test systematically, with an automatic unit testing system such as the __[testthat](https://cran.r-project.org/web/packages/testthat/testthat.pdf)__ package. To use __testthat__ you can simply run:
 
-Another type of test are assertions, which you can implement with e.g. the __[assertive](https://cran.r-project.org/web/packages/assertive/assertive.pdf)__ package. Assertions target not the developer but the user; they err, warn of give messages to the user when something is wrong or suspicious. 
+
+```
+devtools::use_testthat()
+```
+
+Because I run that line, so you will see `tests/` in the root directory of __AGBflux\_pack__. Then you add new tests with:
+
+```
+devtools::use_test("dummytest")
+```
+
+Notice that you now have the file ./tests/thestthat/test-dummytest.R.
+
+
+
+Another type of test that you are already using are assertions. For example, in your code you have something  like this:
+
+``` r
+x <- c(1:3, NA)
+if (any(is.na(x))) {stop("x contains NA")}
+#> Error in eval(expr, envir, enclos): x contains NA
+
+# Or
+stopifnot(!any(is.na(x)))
+#> Error: !any(is.na(x)) is not TRUE
+```
+
+Assertions are nicely implemented with the __[assertive](https://cran.r-project.org/web/packages/assertive/assertive.pdf)__ package. With __assertive__ you can do something like this:
+
+``` r
+assertive::assert_all_are_not_na(x)
+#> Error in assert_engine(is_not_na, x, coerce_to_logical = FALSE, msg = msg, : object 'x' not found
+# Warn instead or err
+assertive::assert_all_are_not_na(x, severity = "warning")
+#> Error in assert_engine(is_not_na, x, coerce_to_logical = FALSE, msg = msg, : object 'x' not found
+```
+
+Assertions target not the developer but the user; they err, warn of give messages to the user when something is wrong or suspicious. 
 
 This are good resources to learn more about unit tests and assertions:
 
@@ -160,18 +197,21 @@ Fields and comments:
 
 # Functions
 
-* Grouping: Consider grouping functions in files by topic.
-* Tab versus space: Avoid using tab to insert spaces. Instead use space.
-* Lines width: Keep the widh of each line no longer than 80 characters. This improves readability. To achive this:
+* __Grouping functions within files.__ Consider grouping functions in files by topic.
 
-  * Guide your eyes setting a margin column marker: Tools > Global Options > Code > Display > Show Margin > Margin Column = 80.
+* __Tab versus space.__ Avoid using tab to insert spaces. Instead use space (see section _Style_).
+
+* __Lines width.__ Keep the widh of each line no longer than 80 characters. This improves readability. To achive this:
+
+  * Set a guide line at 80 characters page width: Tools > Global Options > Code > Display > Show Margin > Margin Column = 80.
   
-  * For comments (both normal and roxygen comments), master the keyboard shortcuts Shift + Control + C to comment a line/paragraph, and Shift + Control + / to brake a paragraph into lines no longer than 80 characters.
+  * For comments (both normal comments and roxygen comments), master these two keyboard shortcuts:
+      * Shift + Control + C to comment a line/paragraph.
+      * Shift + Control + / to brake a paragraph into lines no longer than 80 characters.
 
-* Use a style guide (see section Style) and reformat the code with (select then) Control + Shift + A, or  `formatR::tidy_code()`.
+* Conform with a style guide (see section Style) by reformating the code manually or with (select then) Control + Shift + A, or  `formatR::tidy_code()` (this one, you likely have in your Addins popup menu). This will add spaces after commas, brake lines to fit within  80 characters width, add spaces around equal signs, etc. You may dislike that formatting style butitiseasiertoread.
 
 * Check the style of your package with the __lintr__ package. Also see `goodpractice::gp()`.
-  
 
 
 
@@ -207,4 +247,14 @@ And_aFew.People_RENOUNCEconvention
 --http://r4ds.had.co.nz/workflow-basics.html#whats-in-a-name
 
 
+# Data
 
+You usually need some data, even dummy data, for examples and tests. See `devtools::use_data()`. Or you may want to place data in its own package. An example of this is the package __babynames__. This allows you to reuse  the same  data in different  projects, and to track data versions in the same way you can track package versions. A specific version is easy to install with `devtools::install_github("username/packagename@version")`. 
+
+
+
+# Other things to start thinking about
+
+* Once you are using automated unit tests, you may want to measuere code cover. For example with the  __covr__ package (see `devtools::use_coverage()`).
+
+* Once you are confident of the checks you do locally, you may want to use continuous integration. For example with TravisCI (see `devtools::use_travis()`).
