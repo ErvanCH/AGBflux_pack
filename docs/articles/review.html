@@ -34,6 +34,9 @@
 <li>
   <a href="../articles/index.html">Articles</a>
 </li>
+<li>
+  <a href="../news/index.html">News</a>
+</li>
       </ul>
 <ul class="nav navbar-nav navbar-right"></ul>
 </div>
@@ -56,55 +59,86 @@
     
     
 <div class="contents">
-<p>I wrote this review as a vignette in your package. When you are done reading it, you can remove it simply by deleting <code>vignettes/</code>.</p>
-<div id="installation" class="section level1">
+<div id="title-and-description" class="section level1">
 <h1 class="hasAnchor">
-<a href="#installation" class="anchor"></a>Installation</h1>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(devtools)</code></pre></div>
-<p>Installs OK.</p>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">install_github</span>(<span class="st">"ervanSTRI/AGBflux_pack"</span>)
-<span class="co">#&gt; Downloading GitHub repo ervanSTRI/AGBflux_pack@master</span>
-<span class="co">#&gt; from URL https://api.github.com/repos/ervanSTRI/AGBflux_pack/zipball/master</span>
-<span class="co">#&gt; Installing AGBfluxes</span>
-<span class="co">#&gt; "C:/PROGRA~1/R/R-34~1.1/bin/x64/R" --no-site-file --no-environ --no-save  \</span>
-<span class="co">#&gt;   --no-restore --quiet CMD INSTALL  \</span>
-<span class="co">#&gt;   "C:/Users/dora/AppData/Local/Temp/RtmpENFIGF/devtools3d1c711a1ec8/ervanSTRI-AGBflux_pack-8fc882b"  \</span>
-<span class="co">#&gt;   --library="C:/Users/dora/Documents/R/win-library/3.4" --install-tests</span>
-<span class="co">#&gt; </span></code></pre></div>
-</div>
-<div id="goal" class="section level1">
-<h1 class="hasAnchor">
-<a href="#goal" class="anchor"></a>Goal</h1>
+<a href="#title-and-description" class="anchor"></a>Title and description</h1>
+<p>The title and description tell your users what your package does. You will need them on multiple places:</p>
 <ul>
-<li>Searching for documentation at the package level:</li>
+<li><p>on DESCRIPTION.</p></li>
+<li><p>on README.</p></li>
+<li><p>on the package documentation* (<a href="http://r-pkgs.had.co.nz/man.html#man-packages" class="uri">http://r-pkgs.had.co.nz/man.html#man-packages</a>). (After I install a new package, I typically run <code>?PACKAGENAME</code> to learn what the package does. Then I scroll down to the bottom, and click the link to the “Index”, to see all functions skim their titles.)</p></li>
+<li><p>on GitHub, under the name of your package (title only).</p></li>
 </ul>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(AGBfluxes)
-?AGBflux_pack
-<span class="co">#&gt; No documentation for 'AGBflux_pack' in specified packages and libraries:</span>
-<span class="co">#&gt; you could try '??AGBflux_pack'</span></code></pre></div>
-<p>Needs package documentation (<a href="http://r-pkgs.had.co.nz/man.html#man-packages" class="uri">http://r-pkgs.had.co.nz/man.html#man-packages</a>)</p>
+<p>For consistency and speed, you may write a title and description once and copy it everywhere. I sometimes us rstudio snippets, but this will also work:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">entitle_mypkg &lt;-<span class="st"> </span>function() {
+  <span class="kw">message</span>(<span class="st">"My Package Title"</span>)
+}
+<span class="kw">entitle_mypkg</span>()
+<span class="co">#&gt; My Package Title</span>
+
+describe_mypkg &lt;-<span class="st"> </span>function() {
+  <span class="kw">message</span>(<span class="st">"My package description."</span>)
+}
+<span class="kw">describe_mypkg</span>()
+<span class="co">#&gt; My package description.</span></code></pre></div>
+</div>
+<div id="descripton" class="section level1">
+<h1 class="hasAnchor">
+<a href="#descripton" class="anchor"></a>DESCRIPTON</h1>
+<p>About your DESCRIPTION file:</p>
 <ul>
 <li>
-<p>Searching for help file of any function:</p>
+<code>Type:</code> I’m not sure what this field does.</li>
+<li>
+<code>Version:</code> Consider using a development version until released. The book <em>R Packages</em> recommends adding .9000 to the end of a development verison number to clearly indicate it is not a released version.</li>
+<li>Author<code>and</code>Maintainer<code>: Both fields can be documented with</code>person()<code>(see</code>?person<code>).</code>person()` also offers other potentially useful roles.</li>
+</ul>
+</div>
+<div id="package-infrasctructure" class="section level1">
+<h1 class="hasAnchor">
+<a href="#package-infrasctructure" class="anchor"></a>Package Infrasctructure</h1>
+<p>These functions can help you build useful infrastructure for your package (see <code>?devtools::infrastructure</code>):</p>
+<pre><code>library(devtools)
+
+# Edits DESCRIPTION
+use_dev_version()
+use_gpl3_license()
+
+# Documentation
+use_package_doc()
+use_vignette()
+
+# Tests and checks
+use_testthat()
+use_test(TESTNAME)
+use_travis()
+use_coverage()</code></pre>
+</div>
+<div id="readme" class="section level1">
+<h1 class="hasAnchor">
+<a href="#readme" class="anchor"></a>README</h1>
+<p>If you add a README file, that information will appear at the Home of the package website, and also on the front page of your package repository. <code>README</code> should cover the goal of the package, installation instructions, and an example.</p>
 <ul>
-<li>Typing on the console <code>AGBflux_pack::</code> + tab: Nothing pops up.</li>
+<li><p>Add a README file with <code>devtools::use_readme_rmd()</code>.</p></li>
+<li><p>Remember to knit that .Rmd file whenever you update it. That will generate a .md version. Don’t edit the .md version; edit the .Rmd only.</p></li>
 </ul>
-</li>
-</ul>
-<p>I’m wondering if the package has any function which help file is available.</p>
-<p>Now jumping to the source code to see if there is a man/ folder with documentation.</p>
-<p>Yes, there is documentation.</p>
-<pre><code>?AGB.comp
-?flag.errors
-?LOAD</code></pre>
+</div>
+<div id="website" class="section level1">
+<h1 class="hasAnchor">
+<a href="#website" class="anchor"></a>Website</h1>
+<p>You can bulid and update a your package website simply by running <code>pkgdown::build_site()</code> (I already did this). The website will live in the folder docs/. To host on GitHub go to: Settings &gt; GitHubPages &gt; Source &gt; master branch /docs folder.</p>
+</div>
+<div id="news" class="section level1">
+<h1 class="hasAnchor">
+<a href="#news" class="anchor"></a>NEWS</h1>
+<p>NEWS is where you can explain the main features of each version of your package. Add a NEWS file with <code>devtools::use_news_md()</code> (I already did this). Knit NEWS after updating it (Control + Shift + K).</p>
+<p>You may need to manually fix the name of your package in NEWS. When I created NEWS with <code>devtools::use_news_md()</code>, the name of your package was automatically chopped from “_" onwards.</p>
 </div>
 <div id="checks" class="section level1">
 <h1 class="hasAnchor">
 <a href="#checks" class="anchor"></a>Checks</h1>
 <p>Run <code>devtools::check()</code> (find “Check” in the Build tab) and address errors, warnings and notes.</p>
-<div class="figure">
-<img src="https://i.imgur.com/yYzv7W0.png">
-</div>
+<p><img src="https://i.imgur.com/yYzv7W0.png" width="70%" style="display: block; margin: auto;"></p>
 <div id="notes" class="section level2">
 <h2 class="hasAnchor">
 <a href="#notes" class="anchor"></a>Notes</h2>
@@ -112,8 +146,10 @@
 <pre><code>checking DESCRIPTION meta-information ... NOTE
 Malformed Title field: should not end in a period.</code></pre>
 <p>To solve it, remove the period at the end of the sentence you wrote on the Title field. Also consider this (<a href="http://r-pkgs.had.co.nz/description.html" class="uri">http://r-pkgs.had.co.nz/description.html</a>)</p>
-<pre><code>* shorten the sentence to 80 characters or less.
-* use Title Type Capitalization</code></pre>
+<ul>
+<li>shorten the sentence to 80 characters or less.</li>
+<li>use Title Type Capitalization</li>
+</ul>
 <p>Also, the Licence field has a problem:</p>
 <pre><code>Non-standard license specification:
   What license is it under?
@@ -131,16 +167,16 @@ Do not distribute outside of Widgets Incorporated.</code></pre>
 <h2 class="hasAnchor">
 <a href="#warnings" class="anchor"></a>Warnings</h2>
 <p>This information helps you solve a number of issues. I’ll mention a couple of important ones. You’ll be able to work out the rest. (If the information is unclear, you may find more details here; <a href="http://r-pkgs.had.co.nz/check.html" class="uri">http://r-pkgs.had.co.nz/check.html</a>)</p>
-<p>In the documentation of some function, some parameters that those functions use remain undocumented. One good way to not any important piece of documentation is to step on the function’s name and press Ctrl + Shift + Alt + R. That will automatically write the roxygen skeleton of key documentation inluding all parameters. If you need to use the same parameter in multiple functions, you may avoid duplicating its documentation with <span class="citation">[@template]</span>(<a href="https://cran.r-project.org/web/packages/roxygen2/vignettes/rd.html" class="uri">https://cran.r-project.org/web/packages/roxygen2/vignettes/rd.html</a>).</p>
+<p>In the documentation of some function, some parameters that those functions use remain undocumented. One good way to not any important piece of documentation is to step on the function’s name and press Ctrl + Shift + Alt + R. That will automatically write the roxygen skeleton of key documentation inluding all parameters. If you need to use the same parameter in multiple functions, you may avoid duplicating its documentation with <a href="https://cran.r-project.org/web/packages/roxygen2/vignettes/rd.html">@template</a>.</p>
 <p>Also, you need to rename sume functions. For example, if you rename <code><a href="../reference/density.ind.html">density.ind()</a></code> as <code>density_ind()</code> you will avoid R thinking that <code><a href="../reference/density.ind.html">density.ind()</a></code> is an S3 method of the generic function <code>density()</code> (<a href="http://adv-r.had.co.nz/OO-essentials.html#s3" class="uri">http://adv-r.had.co.nz/OO-essentials.html#s3</a>). Again, that is why it is safer to avoid “.” in function names, unless you intend to wirite an S3 object.</p>
 </div>
 </div>
 <div id="tests" class="section level1">
 <h1 class="hasAnchor">
 <a href="#tests" class="anchor"></a>Tests</h1>
-<p>You are already testing, but in a non-systematic way: you write a function, run it, and see its output on the console to check check if it’s right. You, the developer, will save you a lot of time if you test systematically, with an automatic unit testing system such as the <strong><a href="https://cran.r-project.org/web/packages/testthat/testthat.pdf">testthat</a></strong> package. To use <strong>testthat</strong> you can simply run:</p>
+<p>You are already testing, but likely in a non-systematic way: you write a function, run it, and see its output on the console to check check if it’s right. You, the developer, will save you a lot of time if you test systematically, with an automatic unit testing system such as the <strong><a href="https://cran.r-project.org/web/packages/testthat/testthat.pdf">testthat</a></strong> package. To use <strong>testthat</strong> you can simply run:</p>
 <pre><code>devtools::use_testthat()</code></pre>
-<p>Because I run that line, so you will see <code>tests/</code> in the root directory of <strong>AGBflux_pack</strong>. Then you add new tests with:</p>
+<p>I already did that, so you will see <code>tests/</code> in the root directory of your package. Then you add new tests with:</p>
 <pre><code>devtools::use_test("dummytest")</code></pre>
 <p>Notice that you now have the file ./tests/thestthat/test-dummytest.R.</p>
 <p>Another type of test that you are already using are assertions. For example, in your code you have something like this:</p>
@@ -165,30 +201,22 @@ assertive::<span class="kw">assert_all_are_not_na</span>(x, <span class="dt">sev
 <a href="https://www.crcpress.com/Testing-R-Code/Cotton/p/book/9781498763653">Testing R code, by Richard Cotton</a>.</li>
 </ul>
 </div>
-<div id="file-descripton" class="section level1">
-<h1 class="hasAnchor">
-<a href="#file-descripton" class="anchor"></a>File DESCRIPTON</h1>
-<p>Fields and comments:</p>
-<ul>
-<li>
-<code>Type:</code> I’m not sure what this field does.</li>
-<li>
-<code>Version:</code> Consider using a development version until released. The book <em>R Packages</em> recommends adding .9000 to the end of a development verison number to clearly indicate it is not a released version.</li>
-<li>Author<code>and</code>Maintainer<code>: Both fields can be documented with</code>person()<code>(see</code>?person<code>).</code>person()` also offers other potentially useful roles.</li>
-</ul>
-</div>
 <div id="functions" class="section level1">
 <h1 class="hasAnchor">
 <a href="#functions" class="anchor"></a>Functions</h1>
 <ul>
 <li><p><strong>Grouping functions within files.</strong> Consider grouping functions in files by topic.</p></li>
 <li><p><strong>Tab versus space.</strong> Avoid using tab to insert spaces. Instead use space (see section <em>Style</em>).</p></li>
-<li><p><strong>Lines width.</strong> Keep the widh of each line no longer than 80 characters. This improves readability. To achive this:</p></li>
+<li>
+<p><strong>Lines width.</strong> Keep the widh of each line no longer than 80 characters. This improves readability. To achive this:</p>
+<ul>
 <li><p>Set a guide line at 80 characters page width: Tools &gt; Global Options &gt; Code &gt; Display &gt; Show Margin &gt; Margin Column = 80.</p></li>
 <li>For comments (both normal comments and roxygen comments), master these two keyboard shortcuts:
 <ul>
 <li>Shift + Control + C to comment a line/paragraph.</li>
 <li>Shift + Control + / to brake a paragraph into lines no longer than 80 characters.</li>
+</ul>
+</li>
 </ul>
 </li>
 <li><p>Conform with a style guide (see section Style) by reformating the code manually or with (select then) Control + Shift + A, or <code>formatR::tidy_code()</code> (this one, you likely have in your Addins popup menu). This will add spaces after commas, brake lines to fit within 80 characters width, add spaces around equal signs, etc. You may dislike that formatting style butitiseasiertoread.</p></li>
@@ -197,8 +225,7 @@ assertive::<span class="kw">assert_all_are_not_na</span>(x, <span class="dt">sev
 <div id="author" class="section level2">
 <h2 class="hasAnchor">
 <a href="#author" class="anchor"></a>Author</h2>
-<p>If the author of the package is the author of a function, then that author needs not to be explicitely mentioned in each help file.</p>
-<p>In other words, use @author in help files of functions written but people other than the authors of the package.</p>
+<p>If the author of the package is the author of a function, then that author needs not to be explicitely mentioned in each help file. In other words, use @author in help files of functions written but people other than the authors of the package.</p>
 </div>
 </div>
 <div id="style" class="section level1">
@@ -208,8 +235,6 @@ assertive::<span class="kw">assert_all_are_not_na</span>(x, <span class="dt">sev
 <ul>
 <li>
 <a href="http://style.tidyverse.org/" class="uri">http://style.tidyverse.org/</a> (the one I use).</li>
-<li>
-<a href="https://google.github.io/styleguide/Rguide.xml" class="uri">https://google.github.io/styleguide/Rguide.xml</a>.</li>
 </ul>
 <blockquote>
 <p>Variable and function names should use only lowercase letters, numbers, and _.</p>
@@ -223,6 +248,7 @@ otherPeopleUseCamelCase
 some.people.use.periods
 And_aFew.People_RENOUNCEconvention</code></pre>
 <p>–<a href="http://r4ds.had.co.nz/workflow-basics.html#whats-in-a-name" class="uri">http://r4ds.had.co.nz/workflow-basics.html#whats-in-a-name</a></p>
+<p>Another style guide is this one: <a href="https://google.github.io/styleguide/Rguide.xml" class="uri">https://google.github.io/styleguide/Rguide.xml</a>.</p>
 </div>
 <div id="data" class="section level1">
 <h1 class="hasAnchor">
@@ -237,36 +263,6 @@ And_aFew.People_RENOUNCEconvention</code></pre>
 <li><p>Once you are confident of the checks you do locally, you may want to use continuous integration. For example with TravisCI (see <code>devtools::use_travis()</code>).</p></li>
 </ul>
 </div>
-<div id="readme" class="section level1">
-<h1 class="hasAnchor">
-<a href="#readme" class="anchor"></a>README</h1>
-<p>Add a README file with <code>devtools::use_readme_rmd()</code>. This file will be the Home of the package website.</p>
-</div>
-<div id="package-infrasctructure" class="section level1">
-<h1 class="hasAnchor">
-<a href="#package-infrasctructure" class="anchor"></a>Package infrasctructure</h1>
-<p>See <code>?devtools::infrastructure</code>. Here are a number of functins that will be handy to improve your package. The ones I commonly use are these:</p>
-<pre><code>library(devtools)
-
-# Tests and checks
-use_testthat(pkg = ".")
-use_test(name, pkg = ".")
-use_travis(pkg = ".", browse = interactive())
-use_coverage(pkg = ".", type = c("codecov", "coveralls"))
-
-# Documentation
-use_package_doc(pkg = ".")
-use_vignette(name, pkg = ".")
-
-# Edits DESCRIPTION
-use_dev_version(pkg = ".")
-use_gpl3_license(pkg = ".")</code></pre>
-</div>
-<div id="website" class="section level1">
-<h1 class="hasAnchor">
-<a href="#website" class="anchor"></a>Website</h1>
-<p>You can make a website for your package with <code>pkgdown::build_site()</code>. I made one (see folder docs/) which you can host on GitHub (Settings &gt; GitHubPages &gt; Source &gt; master branch /docs folder). But you’d want to update the website often to incorporate the latests features of your package.</p>
-</div>
 </div>
   </div>
 
@@ -274,8 +270,12 @@ use_gpl3_license(pkg = ".")</code></pre>
         <div id="tocnav">
       <h2>Contents</h2>
       <ul class="nav nav-pills nav-stacked">
-<li><a href="#installation">Installation</a></li>
-      <li><a href="#goal">Goal</a></li>
+<li><a href="#title-and-description">Title and description</a></li>
+      <li><a href="#descripton">DESCRIPTON</a></li>
+      <li><a href="#package-infrasctructure">Package Infrasctructure</a></li>
+      <li><a href="#readme">README</a></li>
+      <li><a href="#website">Website</a></li>
+      <li><a href="#news">NEWS</a></li>
       <li>
 <a href="#checks">Checks</a><ul class="nav nav-pills nav-stacked">
 <li><a href="#notes">Notes</a></li>
@@ -283,7 +283,6 @@ use_gpl3_license(pkg = ".")</code></pre>
       </ul>
 </li>
       <li><a href="#tests">Tests</a></li>
-      <li><a href="#file-descripton">File DESCRIPTON</a></li>
       <li>
 <a href="#functions">Functions</a><ul class="nav nav-pills nav-stacked">
 <li><a href="#author">Author</a></li>
@@ -292,9 +291,6 @@ use_gpl3_license(pkg = ".")</code></pre>
       <li><a href="#style">Style</a></li>
       <li><a href="#data">Data</a></li>
       <li><a href="#other-things-to-start-thinking-about">Other things to start thinking about</a></li>
-      <li><a href="#readme">README</a></li>
-      <li><a href="#package-infrasctructure">Package infrasctructure</a></li>
-      <li><a href="#website">Website</a></li>
       </ul>
 </div>
       </div>

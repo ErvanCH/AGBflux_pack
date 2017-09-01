@@ -32,51 +32,90 @@ knitr::opts_chunk$set(
 options(dplyr.print_min = 6, dplyr.print_max = 6)
 ```
 
-I wrote this review as a vignette in your  package. When you are done reading it, you can remove it simply by deleting `vignettes/`.
 
 
+# Title and description
 
+The title and description tell your users what your package does. You will need them on multiple places:
 
-# Installation
+* on DESCRIPTION.
+
+* on README.
+
+* on the package documentation\* (http://r-pkgs.had.co.nz/man.html#man-packages). (After I install a new package, I typically run `?PACKAGENAME` to learn what the package does. Then I scroll down to the bottom, and click the link to the "Index", to see all functions skim their titles.)
+
+* on GitHub, under the name of your package (title only).
+
+For consistency and speed, you may write a title and description once and copy it everywhere. I sometimes us rstudio snippets, but this will also work:
 
 ```{r}
+entitle_mypkg <- function() {
+  message("My Package Title")
+}
+entitle_mypkg()
+
+describe_mypkg <- function() {
+  message("My package description.")
+}
+describe_mypkg()
+```
+
+
+
+# DESCRIPTON
+
+About your DESCRIPTION file:
+
+* `Type:` I'm not sure what this field does.
+* `Version:` Consider using a development version until released. The book _R Packages_ recommends adding .9000 to the end of a development verison number to clearly indicate it is not a released version.
+* Author`and `Maintainer`: Both fields can be documented with `person()` (see `?person`). `person()` also offers other potentially useful roles.
+
+
+
+# Package Infrasctructure
+
+These functions can help you build useful infrastructure for your package (see `?devtools::infrastructure`):
+```
 library(devtools)
+
+# Edits DESCRIPTION
+use_dev_version()
+use_gpl3_license()
+
+# Documentation
+use_package_doc()
+use_vignette()
+
+# Tests and checks
+use_testthat()
+use_test(TESTNAME)
+use_travis()
+use_coverage()
 ```
 
-Installs OK.
 
-```{r}
-install_github("ervanSTRI/AGBflux_pack")
-```
 
-# Goal
+# README
 
-* Searching for documentation at the package level:
+If you add a README file, that information will appear at the Home of the package website, and also on the front page of your package repository. `README` should cover the goal of the package, installation instructions, and an example.
 
-```{r}
-library(AGBfluxes)
-?AGBflux_pack
-```
+* Add a README file with `devtools::use_readme_rmd()`. 
 
-Needs package documentation (http://r-pkgs.had.co.nz/man.html#man-packages)
+* Remember to knit that .Rmd file whenever you update it. That will generate a .md version. Don't edit the .md version; edit the .Rmd only.
 
 
 
-* Searching for help file of any function:
+# Website 
 
-    * Typing on the console `AGBflux_pack::` + tab: Nothing pops up. 
-    
-I'm wondering if the package has any function which help file is available.
+You can bulid and update a your package website simply by running `pkgdown::build_site()` (I already did this). The website  will live in the folder docs/. To host on GitHub go to: Settings > GitHubPages > Source > master branch /docs folder.
 
-Now jumping to the source code to see if there is a man/ folder with documentation.
 
-Yes, there is documentation.
 
-```
-?AGB.comp
-?flag.errors
-?LOAD
-```
+# NEWS
+
+NEWS is where you can explain the main features of each version of your package. Add a NEWS file with `devtools::use_news_md()` (I already did this). Knit NEWS after updating it (Control + Shift + K).
+
+You may need to manually fix the name of your package in NEWS. When I created NEWS with `devtools::use_news_md()`, the name of your package was automatically chopped from "_" onwards.
 
 
 
@@ -84,8 +123,9 @@ Yes, there is documentation.
 
 Run `devtools::check()` (find "Check" in the Build tab) and address errors, warnings and notes.
 
-![](https://i.imgur.com/yYzv7W0.png)
-
+```{r, echo=FALSE}
+knitr::include_graphics("https://i.imgur.com/yYzv7W0.png")
+```
 
 ## Notes
 
@@ -98,8 +138,8 @@ Malformed Title field: should not end in a period.
 
 To solve it, remove the period at the end of the sentence you wrote on the Title field. Also consider this (http://r-pkgs.had.co.nz/description.html)
 
-    * shorten the sentence to 80 characters or less.
-    * use Title Type Capitalization
+* shorten the sentence to 80 characters or less.
+* use Title Type Capitalization
 
 Also, the Licence field has a problem:
 
@@ -126,7 +166,7 @@ Do not distribute outside of Widgets Incorporated.
 
 This information helps you solve a number of issues. I'll mention a couple of important ones. You'll be able to work out the rest. (If the information is unclear, you may find more details here; http://r-pkgs.had.co.nz/check.html)
 
-In the documentation of some function, some parameters that those functions use remain undocumented. One good way to not any important piece of documentation is to step on the function's name and press Ctrl + Shift + Alt + R. That will automatically write the roxygen skeleton of key documentation inluding all parameters. If you need to use the same  parameter in multiple functions, you may avoid duplicating its documentation with [@template](https://cran.r-project.org/web/packages/roxygen2/vignettes/rd.html).
+In the documentation of some function, some parameters that those functions use remain undocumented. One good way to not any important piece of documentation is to step on the function's name and press Ctrl + Shift + Alt + R. That will automatically write the roxygen skeleton of key documentation inluding all parameters. If you need to use the same  parameter in multiple functions, you may avoid duplicating its documentation with [\@template](https://cran.r-project.org/web/packages/roxygen2/vignettes/rd.html).
 
 Also, you need to rename sume functions. For example, if you rename  `density.ind()` as `density_ind()` you will avoid R thinking that `density.ind()` is an S3 method of the generic function `density()` (http://adv-r.had.co.nz/OO-essentials.html#s3). Again, that is why it is safer to avoid "." in function names, unless you intend to wirite an S3 object.
 
@@ -137,14 +177,14 @@ Also, you need to rename sume functions. For example, if you rename  `density.in
 
 # Tests
 
-You are already testing, but in a non-systematic way: you write a function, run it, and see its output  on the console to check check if it's right. You, the developer, will save you a lot of time if you test systematically, with an automatic unit testing system such as the __[testthat](https://cran.r-project.org/web/packages/testthat/testthat.pdf)__ package. To use __testthat__ you can simply run:
+You are already testing, but likely in a non-systematic way: you write a function, run it, and see its output  on the console to check check if it's right. You, the developer, will save you a lot of time if you test systematically, with an automatic unit testing system such as the __[testthat](https://cran.r-project.org/web/packages/testthat/testthat.pdf)__ package. To use __testthat__ you can simply run:
 
 
 ```
 devtools::use_testthat()
 ```
 
-Because I run that line, so you will see `tests/` in the root directory of __AGBflux\_pack__. Then you add new tests with:
+I already did that, so you will see `tests/` in the root directory of your package. Then you add new tests with:
 
 ```
 devtools::use_test("dummytest")
@@ -185,15 +225,6 @@ This are good resources to learn more about unit tests and assertions:
 
 
 
-# File DESCRIPTON
-
-Fields and comments:
-
-* `Type:` I'm not sure what this field does.
-* `Version:` Consider using a development version until released. The book _R Packages_ recommends adding .9000 to the end of a development verison number to clearly indicate it is not a released version.
-* Author`and `Maintainer`: Both fields can be documented with `person()` (see `?person`). `person()` also offers other potentially useful roles.
-
-
 
 # Functions
 
@@ -203,11 +234,11 @@ Fields and comments:
 
 * __Lines width.__ Keep the widh of each line no longer than 80 characters. This improves readability. To achive this:
 
-  * Set a guide line at 80 characters page width: Tools > Global Options > Code > Display > Show Margin > Margin Column = 80.
+    + Set a guide line at 80 characters page width: Tools > Global Options > Code > Display > Show Margin > Margin Column = 80.
   
-  * For comments (both normal comments and roxygen comments), master these two keyboard shortcuts:
-      * Shift + Control + C to comment a line/paragraph.
-      * Shift + Control + / to brake a paragraph into lines no longer than 80 characters.
+    + For comments (both normal comments and roxygen comments), master these two keyboard shortcuts:
+        - Shift + Control + C to comment a line/paragraph.
+        - Shift + Control + / to brake a paragraph into lines no longer than 80 characters.
 
 * Conform with a style guide (see section Style) by reformating the code manually or with (select then) Control + Shift + A, or  `formatR::tidy_code()` (this one, you likely have in your Addins popup menu). This will add spaces after commas, brake lines to fit within  80 characters width, add spaces around equal signs, etc. You may dislike that formatting style butitiseasiertoread.
 
@@ -217,10 +248,7 @@ Fields and comments:
 
 ## Author
 
-If the author of the package is the author of a function, then that author needs not to be explicitely mentioned in each help file. 
-
-In other words, use \@author in help files of functions written but people other than the authors of the package.
-
+If the author of the package is the author of a function, then that author needs not to be explicitely mentioned in each help file. In other words, use \@author in help files of functions written but people other than the authors of the package.
 
 
 
@@ -229,13 +257,14 @@ In other words, use \@author in help files of functions written but people other
 Use a style guide, e.g. 
 
 * http://style.tidyverse.org/ (the one I use).
-* https://google.github.io/styleguide/Rguide.xml.
 
 > Variable and function names should use only lowercase letters, numbers, and _.
 
-> Use underscores (_) to separate words within a name. Base R uses dots in function names (contrib.url()) and class names (data.frame), but it’s better to reserve dots exclusively for the S3 object system. In S3, methods are given the name function.class; if you also use . in function and class names you end up with confusing methods like as.data.frame.data.frame().
+> Use underscores (_) to separate words within a name. Base R uses dots in function names (contrib.url()) and class names (data.frame), but it's better to reserve dots exclusively for the S3 object system. In S3, methods are given the name function.class; if you also use . in function and class names you end up with confusing methods like as.data.frame.data.frame().
 
 --http://style.tidyverse.org/syntax.html#object-names
+
+
 
 ```
 i_use_snake_case
@@ -245,6 +274,9 @@ And_aFew.People_RENOUNCEconvention
 ```
 
 --http://r4ds.had.co.nz/workflow-basics.html#whats-in-a-name
+
+Another style guide is this one: https://google.github.io/styleguide/Rguide.xml.
+
 
 
 # Data
@@ -261,38 +293,4 @@ You usually need some data, even dummy data, for examples and tests. See `devtoo
 
 
 
-
-# README
-
-Add a README file with `devtools::use_readme_rmd()`. This file will be the Home of the package website.
-
-
-
-# Package infrasctructure
-
-See `?devtools::infrastructure`. Here are a number of functins that will be handy to improve your package. The ones I commonly use are these:
-
-```
-library(devtools)
-
-# Tests and checks
-use_testthat(pkg = ".")
-use_test(name, pkg = ".")
-use_travis(pkg = ".", browse = interactive())
-use_coverage(pkg = ".", type = c("codecov", "coveralls"))
-
-# Documentation
-use_package_doc(pkg = ".")
-use_vignette(name, pkg = ".")
-
-# Edits DESCRIPTION
-use_dev_version(pkg = ".")
-use_gpl3_license(pkg = ".")
-```
-
-
-
-# Website 
-
-You can make a website for your package with `pkgdown::build_site()`. I made one (see folder docs/) which you can host on GitHub (Settings > GitHubPages > Source > master branch /docs folder). But you'd want to update the website often to incorporate the latests features of your package.
 
