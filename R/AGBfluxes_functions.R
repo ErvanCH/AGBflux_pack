@@ -11,11 +11,12 @@
 #' @param draw.graph TRUE or FALSE, if TRUE, draw graph for trees with 'erroneous' DBH measures/productivity
 #' @param output.errors TRUE or FALSE, if TRUE, creat a CSV file with all trees with erroneous DBH measures/productivity
 #' @param DATA_path allows to provide a different path where the data are located
-#' @param exclude.interval a vector (i.e. c(1,2)) indicating if a set of census intervals must be discarded from computation due for instance to a change in  protocol of measurment
+#' @param exclude.interval NULL by default. If needed a vector (e.g. c(1,2)) indicating which census interval(s) must be discarded from computation due, for instance, to a change in  protocol of measurment
 #' @return a data.table (data.frame) with all relevant variables.
 #' @export
 
-data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,maxrel=20,draw.graph,output.errors,DATA_path,exclude.interval=exclude.interval) {
+data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,maxrel=20,draw.graph,output.errors,DATA_path,exclude.interval=NULL) {
+	requireNamespace("data.table", quietly = TRUE)
 	site <- tolower(site)
 	INDEX <- match(tolower(site),site.info$site)
 	if (is.na(INDEX)) {			stop("Site name should be one of the following: \n",paste(levels(factor(site.info$site)),collapse=" - ")) }
@@ -41,7 +42,7 @@ data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,max
 	rm(temp)
 	df <- data.table(df[-1,])
 
-	df <- data.correction(df,taper.correction,fill.missing)
+	df <- system.time(data.correction(df,taper.correction,fill.missing))
 	print("Step 1: data correction done.")
 
 	df <- computeAGB(df,site,palm,DATA_path)
@@ -53,7 +54,7 @@ data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,max
 	DF <- flag.errors(DF,site,strangler=strangler,maxrel=maxrel,draw.graph=draw.graph,output.errors=output.errors,exclude.interval=exclude.interval)
 	print("Step 4: errors flagged. Saving corrected data into /output folder.")
 
-	save(DF,file=paste0(path_folder,"/output/",site,"_census_intervals.Rdata"))
+	save(DF,file=paste0(path_folder,"/output/",site,"_census_intervals_10perc.Rdata"))
 
 	rm(list=setdiff(ls(), c("DF","path_folder","SITE", lsf.str())))
 	return(DF)
@@ -66,27 +67,27 @@ data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,max
 #' @param fill.missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
 #' @return a data.table (data.frame) with all relevant variables.
 #' @export
-
 data.correction <- function(df,taper.correction,fill.missing) {
+	requireNamespace("data.table", quietly = TRUE)
 	df <- df[!status%in%c("P","V"),] # discard all priors & vanished trees
-	df[,id :=paste(df$treeID,df$stemID,sep="-")] # creat a unique tree-stem ID
+	df[,"id" :=paste(treeID,stemID,sep="-")] # creat a unique tree-stem ID
 	df <- df[order(id,CensusID)]
 	df[,status1:=normal.stat(.SD),by=id]
-
+	
 	df[status1=="M", nrow2 := seq_len(.N), by = id]
 	df <- within(df,nrow2[is.na(nrow2)] <- 0)
 	df <- within(df,status1[nrow2==1] <- "D") # multiple missing trees are considered as dead at first occurrence
 	df <- df[nrow2<2]  # keeps only 1 line for dead trees
-
+	
 	df[status1=="D", nrow := seq_len(.N), by = id]
 	df <- within(df,nrow[is.na(nrow)] <- 0)
 	df <- df[nrow<2,]  # keeps only 1 line for dead trees
 	df[,c("nrow","nrow2"):=NULL]
-
+	
 	df[,year:=round(mean(as.numeric(substr(ExactDate,1,4)),na.rm=T)),by=CensusID] # Assign 1 year per census
 	NO.MEASURE <- df[,all(is.na(dbh)),by=id]
 	df <- df[!id%in%NO.MEASURE$treeID[NO.MEASURE$V1]] # remove stems without any measure
-
+	
 	# Taper correction or missing values: -> fill gaps for missing values
 	df[, c("dbh2","hom2") := corDBH(.SD,taper.correction=taper.correction,fill.missing=fill.missing), by=id] # might be time consuming (4 minutes for BCI)
 	table(is.na(df$dbh2),df$status1)
@@ -94,6 +95,79 @@ data.correction <- function(df,taper.correction,fill.missing) {
 	table(NO.MEASURE$V1)
 	df <- df[!treeID%in%NO.MEASURE$treeID[NO.MEASURE$V1]] # remove trees without any measurement
 	return(df)
+}
+
+#' Data correction
+#' @author Ervan Rutishauser (er.rutishauser@gmail.com)
+#' @description Perform two mains tasks: (a) apply a taper correction when POM is > 130 cm, and (b) linear interpolation values when missing DBHs. Interpolation of missing values is done by averaging surrounding available DBH values.
+#' @param DF a data.table
+#' @param taper.correction TRUE or FALSE, are you willing to apply Cushman et al (2014) taper correction?
+#' @param fill.missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
+#' @return a data.table (data.frame) with all relevant variables.
+#' @export
+corDBH <- function(DF,taper.correction,fill.missing) {
+	hom2 <-  round(as.numeric(DF$hom)*100)/100
+	dbh2 <-  DF$dbh
+	eval(
+	if (!all(is.na(dbh2))) { # if all DBH are NA -> can't do much -> much be discarded
+		if (fill.missing & any(is.na(dbh2)))  { # Feel gap for missing DBH with average between prior and next census
+			loc <- which(is.na(dbh2))
+			if (any(grepl("R",DF$codes))) { # avoid resprouts
+				RESP <- which(grepl("R",DF$codes))
+				if (loc[1]!=min(RESP)) {
+					if(any(loc==1)) {
+						M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+						M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
+					} else {
+						M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+						M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
+					dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
+					hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
+					
+					while(any(is.na(dbh2))) {
+						loc <- which(is.na(dbh2))
+						if(any(loc==1)) {
+							M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+							M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
+						} else {
+							M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+							M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
+						dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
+						hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
+					}
+				}}# end of resprout
+			
+			if(any(loc==1)) {
+				M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+				M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
+			} else {
+				M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+				M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
+			dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
+			hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
+			
+			while(any(is.na(dbh2))) {
+				loc <- which(is.na(dbh2))
+				if(any(loc==1)) {
+					M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+					M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
+				} else {
+					M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
+					M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
+				dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
+				hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
+			}}# end of missing loop
+		if (any(is.na(hom2))) { hom2[is.na(hom2)] <- 1.3}
+		
+		# Apply Cushman's correction to trees with POM changed
+		if (taper.correction & any(hom2 > 1.3)) {
+			ifelse(any(grepl("R",DF$codes)),ind1 <- 1:(grep("R",DF$codes)[1]-1),ind1 <-  which(DF$status!="D"))
+			dbh2[ind1] <- round(dbh2[ind1]*exp(0.0247*(hom2[ind1]-1.3)),1)
+			# dbh2[DF$status=="D"] <- tail(dbh2[DF$status=="A" & !is.na(dbh2)],1)  # replicate last dbh to dead trees
+			hom2 <- rep(1.3,nrow(DF))
+		}}
+	
+	return(list(dbh2,hom2))
 }
 
 #' Biomass computation
@@ -106,6 +180,7 @@ data.correction <- function(df,taper.correction,fill.missing) {
 #' @export
 
 computeAGB <- function(df,site,palm=T,DATA_path) {
+	requireNamespace("data.table", quietly = TRUE)
 	## Allocate wood density
 	df$wsg <- density.ind(df=df,site,wsg=WSG)
 
@@ -146,6 +221,7 @@ computeAGB <- function(df,site,palm=T,DATA_path) {
 #' @export
 
 format.interval <- function(df,strangler) {
+	requireNamespace("data.table", quietly = TRUE)
 	# Receiveing data set
 	DF <- data.table("treeID"=NA,"dbh1"=NA,"dbhc1"=NA,"status1"=NA,"code1"=NA,"hom1"=NA,"agb1"=NA,"date1"=NA,"dbh2"=NA,"dbhc2"=NA,"status2"=NA,"code2"=NA,"hom2"=NA,"agb2"=NA,"agbl"=NA,"date2"=NA,"interval"=NA,"year"=NA)
 
@@ -212,7 +288,7 @@ format.interval <- function(df,strangler) {
 	if(strangler) {
 		DF$ficus <- 0
 		ficus$name <- paste(ficus$Genus,ficus$Species,sep=" ")
-		FIC <- match(DF$name,ficus$name)
+		FIC <- match(DF$name,ficus$name[ficus$Strangler=="Yes"])
 		DF <- within(DF,ficus[!is.na(FIC)]<-1)
 	}
 	return(DF)
@@ -235,44 +311,57 @@ flag.errors <- function(DF,site,strangler,maxrel,draw.graph,output.errors,exclud
 	mean.prod <- determine.mean.prod(DF,site,strangler,exclude.interval)
 	DF[,prod.rel:=as.numeric(NA),]
 	DF[,prod.rel:=prod.g*100/mean.prod] # relative contribution to average total productivity
-	DF[,error.prod:=0]
-	DF <- within(DF,error.prod[prod.rel>maxrel & dHOM==0 & code!="D"] <- 1)
-	DF <- within(DF,error.prod[prod.rel<(-maxrel) & dHOM==0 & code!="D"] <- -1)
-	table(DF$error.prod,DF$year)
+	DF[,error:=0]
+	DF <- within(DF,error[prod.rel>maxrel & dHOM==0 & code!="D"] <- 1)
+	DF <- within(DF,error[prod.rel<(-maxrel) & dHOM==0 & code!="D"] <- -1)
 
-	# Filter for AGB loss: discard trees that have major errors at previous census of year of death
-	DF[,error.loss:=0]
-	ID.loss <- DF[,treeID[.I[code=="D"]][error.prod[.I[code=="D"]-1]!=0]]
-	DF <- within(DF,error.loss[treeID%in%ID.loss & code=="D"] <- 1)
-	table(DF$error.loss,DF$year)
-	ID <- DF[error.prod!=0 & code!="D",nrow(.SD)>1,by=treeID]
-
-	if(draw.graph) { # Plot trees with large major error
-		if(nrow(ID[ID$V1])>0 & nrow(ID[ID$V1])<20) {
+	# Flag census after a major error
+	POSI <- DF[,.I[error!=0]+1,]
+	POSI2 <- DF[POSI,.I[error==0 & dHOM==0],]
+	DF <- within(DF,error[POSI[POSI2]] <- 2) # flag consecutive census
+	ID <- DF[error!=0 & !code%in%c("D","R"),nrow(.SD)>1,by=treeID]
+	ID <- ID$treeID[ID$V1]
+  if (length(ID)/12 > 10) {
+  A <- 	menu(c("Y", "N"), title="There are more than 144 trees (10 pages) to be printed. Do you want to print all?") 
+  ifelse(A==1,draw.graph<-T,draw.graph<-F)
+  }
+	if(draw.graph ) { # Plot trees with large major error
 			YEAR <- levels(factor(DF$year))
 			CX=2
-
-			DF[,year:=as.numeric(year)]
-			X <- DF[treeID%in%ID[V1==T,treeID] & !code%in%c("R") ][order(treeID,year)]
-			X$point <- 0
-			X$point[X$error.prod!=0] <- 1
-			Y <- DF[treeID%in%ID[V1==T,treeID] & !code%in%c("D","R") ][order(treeID,year)]
-			YY <- Y[,.(year=max(year),name=unique(name),d2=dbhc2[year==max(year)],d02=dbh2[year==max(year)],hom2=hom2[year==max(year)]),by=treeID]
-			Y$line <- 0
-			Y$line[Y$dHOM==0] <- 1
-			Y$point <- 0
-			Y$point[Y$error.prod!=0] <- 1
-
-			A <- ggplot(X,aes(x=year,y=dbhc1)) + geom_point(size=2) + facet_wrap(~treeID+name,scale="free",ncol=3,labeller = label_wrap_gen(multi_line=FALSE,width=50))  + geom_segment(data=Y,aes(x=year,y=dbhc1,xend=year+5,yend=dbhc2,linetype=as.factor(line))) + geom_point(data=X[point==1],aes(x=year+5,y=dbhc2),col=2)	+ labs(x="Year",y="dbh (mm)") + geom_text(data=Y,aes(x=year,y=dbh1-(0.05*dbh1)),label=round(Y$hom1,2),cex=CX)	+ geom_text(data=YY,aes(x=year+5,y=d02-(0.05*d02)),label=round(YY$hom2,2),cex=CX) + geom_text(data=Y,aes(x=year,y=dbh1-(0.05*dbh1)),label=round(Y$hom1,2),cex=CX) + geom_text(data=Y,aes(x=year,y=0.2*max(dbh2)),label=Y$dbh1,cex=CX,angle=90,vjust=1) + geom_text(data=YY,aes(x=year+5,y=0.2*max(d2)),label=YY$d02,cex=CX,angle=90,vjust=1) + theme(plot.title = element_text(hjust = 0.5,size=2*CX,face="bold"),axis.text.y = element_text(size=4*CX),axis.text.x = element_text(size=4*CX,vjust=0,angle=30),panel.background = element_blank(),strip.text = element_text(size = 4*CX,face="bold"),strip.background = element_rect("lightgrey"),panel.spacing = unit(0.1, "lines")) + scale_linetype_manual(values=c('0'="dashed",'1'="solid")) + guides(linetype=F,colour=F) + scale_x_continuous(limits=c(min(as.numeric(YEAR))-3,max(as.numeric(YEAR))+3))
-			print(A)
-			ggsave(A,file=paste0(path_folder,"/output/trees_with_major_errors.pdf"),width = 21, height = 29.7, units = "cm")
-		} else if (nrow(ID[ID$V1])>20)
-		{print(paste0("Too many graphs (N=",nrow(ID[ID$V1]),") to be drawned"))
-		} else
-		{ print(paste0("No tree productivity above",maxrel, "% or below",-maxrel,"% of mean productivity at your plot. You may eventually try a lower threshold.")) }
-	} # end of print
-	if (output.errors & nrow(ID[ID$V1])>0){
-		write.csv(DF[treeID%in%ID$treeID],file=paste0(path_folder,"/output/trees_with_major_errors.csv"))
+			a=0
+			i = 0
+			GRAPH = list()
+	
+			for (n in 1:length(ID)){
+				i = i + 1
+				DF[,year:=as.numeric(year)]
+				X <- DF[treeID==ID[n] & !code%in%c("R")][order(year)]
+				X$point <- 0
+				X$point[X$error!=0] <- 1
+				Y <- DF[treeID==ID[n] & !code%in%c("D","R")][order(year)]
+				YY <- Y[,.(year=max(year),name=unique(name),d2=dbhc2[year==max(year)],d02=dbh2[year==max(year)],hom2=hom2[year==max(year)]),by=treeID]
+				Y$line <- 0
+				Y$line[Y$dHOM==0] <- 1
+				Y$point <- 0
+				Y$point[Y$error!=0] <- 1
+	     
+				GRAPH[[i]] = ggplot(X,aes(x=year,y=dbhc1)) + geom_point(size=2) + geom_segment(data=Y,aes(x=year,y=dbhc1,xend=year+5,yend=dbhc2,linetype=as.factor(line))) + geom_point(data=X[point==1],aes(x=year+5,y=dbhc2),col=2)	+ labs(title=paste0(unique(X$name)," (",ID[n],")"), x=" ",y="dbh (mm)") + geom_text(data=Y,aes(x=year,y=dbh1-(0.05*dbh1)),label=round(Y$hom1,2),cex=CX)	+ geom_text(data=YY,aes(x=year+5,y=d02-(0.05*d02)),label=round(YY$hom2,2),cex=CX) + geom_text(data=Y,aes(x=year,y=0.3*max(dbhc2)),label=Y$dbh1,cex=CX,angle=90,vjust=1) + geom_text(data=YY,aes(x=year+5,y=0.3*max(d2)),label=YY$d02,cex=CX,angle=90,vjust=1) + theme(plot.title = element_text(size=5*CX,face="bold"),axis.title.y= element_text(size=5*CX,,face="bold"),axis.text.y = element_text(size=4*CX),axis.text.x = element_text(size=4*CX,vjust=0,angle=30),panel.background = element_blank(),strip.text = element_text(size = 4*CX,face="bold"),strip.background = element_rect("lightgrey"),panel.spacing = unit(0.1, "lines")) + scale_linetype_manual(values=c('0'="dashed",'1'="solid")) + guides(linetype=F,colour=F) + scale_x_continuous(limits=c(min(as.numeric(YEAR))-3,max(as.numeric(YEAR))+3),breaks = as.numeric(YEAR)) + scale_y_continuous(limits=c(0.2*max(YY$d2),max(X$dbhc2,X$dbhc1)))
+				
+				
+		if (i %% 15 == 0) { ## print 8 plots on a page
+				a=a+1	
+				plot(do.call(grid.arrange,  GRAPH))
+				ggsave(do.call(grid.arrange,  GRAPH),file=paste0(path_folder,"/output/trees_with_major_errors_",a,".pdf"),width = 29.7, height = 20.1, units = "cm")
+				GRAPH = list() # reset plot
+				i = 0 # reset index
+				}}
+				} # end of graph 
+			
+		if (length(ID)==0){ 
+			print(paste0("No tree productivity above",maxrel, "% or below",-maxrel,"% of mean productivity at your plot. You may eventually want to try a lower threshold.")) 
+			}
+		if (output.errors & length(ID)>0){
+		write.csv(DF[treeID%in%ID],file=paste0(path_folder,"/output/trees_with_major_errors.csv"))
 	}
 	return(DF)
 } # end of major.error
@@ -290,11 +379,11 @@ flag.errors <- function(DF,site,strangler,maxrel,draw.graph,output.errors,exclud
 determine.mean.prod <- function(DF,site,strangler,exclude.interval) {
 	AREA <- site.info$size[match(site,site.info$site)]
 	if (missing(exclude.interval)){
-		ifelse(strangler,PRODA <- DF[ficus!=1, .(prod=sum(prod.g,na.rm=T)), by=interval],PRODA <- DF[, .(prod=sum(prod.g,na.rm=T)), by=interval])
+		ifelse(strangler,PRODA <- data.table(DF)[ficus!=1,.(prod=rec.flux(sum(agb1,na.rm=T),sum(agb2[code!="D"],na.rm=T),sum(agb1[code%in%c("A","AC")],na.rm=T),AREA,mean(int,na.rm=T))), by=interval],PRODA <- data.table(DF)[, .(prod=rec.flux(sum(agb1,na.rm=T),sum(agb2[code!="D"],na.rm=T),sum(agb1[code%in%c("A","AC")],na.rm=T),AREA,mean(int,na.rm=T))), by=interval])
 	}	else {
-		ifelse(strangler,PRODA <- DF[ficus!=1 & !interval%in%c(exclude.interval), .(prod=sum(prod.g,na.rm=T)), by=interval],PRODA <- DF[!interval%in%c(exclude.interval), .(prod=sum(prod.g,na.rm=T)), by=interval])
+		ifelse(strangler,PRODA <- data.table(DF)[ficus!=1 & !interval%in%c(exclude.interval),.(prod=rec.flux(sum(agb1,na.rm=T),sum(agb2[code!="D"],na.rm=T),sum(agb1[code%in%c("A","AC")],na.rm=T),AREA,mean(int,na.rm=T))), by=interval],PRODA <- data.table(DF)[!interval%in%c(exclude.interval),.(prod=rec.flux(sum(agb1,na.rm=T),sum(agb2[code!="D"],na.rm=T),sum(agb1[code%in%c("A","AC")],na.rm=T),AREA,mean(int,na.rm=T))), by=interval])
 	}
-	mPROD <- mean((PRODA$prod)/AREA)
+	mPROD <- mean((PRODA$prod))
 	return(mPROD)
 }
 
@@ -306,12 +395,18 @@ determine.mean.prod <- function(DF,site,strangler,exclude.interval) {
 #' @param range the range of initial AGB to be used for prediction (i.e. 5th and 95th percentiles of the whole distribution)
 #' @return a smoothed prediction of the variable of interest
 #' @export
-loess.fun <- function(x,var,range)  {
+loess.fun <- function(x,var,range,alpha=NULL)  {
 	fit <- locfit(var ~ lAGB, data=x)
 	pred <- predict(fit,newdata=list(lAGB=range))
 	return(data.frame(lAGB=range,y=as.numeric(pred)))
 }
 
+# loess.fun <- function(x,var)  {
+# 	fit <- locfit(var ~ lAGB, data=x)
+# 	Xrange = as.numeric(quantile(x,seq(0.01,1,.01),na.rm=T)) # 100 values to estimate the smooth spline
+# 	pred <- predict(fit,newdata=list(lAGB=Xrange))
+# 	return(data.frame(lAGB=Xrange,y=as.numeric(pred)))
+# }
 #' Normalized tree status
 #' @author Ervan Rutishauser (er.rutishauser@gmail.com)
 #' @description Check the consistency of stem/tree status over time (i.e. a tree that is 'alive' at last census can not be 'dead' inbetween)
@@ -395,80 +490,6 @@ AGB.comp <- function (site,D,WD, H = NULL) {
 	return(AGB)
 }
 
-#' Data correction
-#' @author Ervan Rutishauser (er.rutishauser@gmail.com)
-#' @description Perform two mains tasks: (a) apply a taper correction when POM is > 130 cm, and (b) linear interpolation values when missing DBHs. Interpolation of missing values is done by averaging surrounding available DBH values.
-#' @param DF a data.table
-#' @param taper.correction TRUE or FALSE, are you willing to apply Cushman et al (2014) taper correction?
-#' @param fill.missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
-#' @return a data.table (data.frame) with all relevant variables.
-#' @export
-
-# Correction of DBH
-corDBH <- function(DF,taper.correction,fill.missing) {
-	hom2 <-  round(as.numeric(DF$hom)*100)/100
-	dbh2 <-  DF$dbh
-
-	if (!all(is.na(dbh2))) { # if all DBH are NA -> can't do much -> much be discarded
-		if (fill.missing & any(is.na(dbh2)))  { # Feel gap for missing DBH with average between prior and neDFt census
-			loc <- which(is.na(dbh2))
-			if (any(grepl("R",DF$codes))) { # avoid resprouts
-				RESP <- which(grepl("R",DF$codes))
-				if (loc[1]!=min(RESP)) {
-					if(any(loc==1)) {
-						M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-						M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
-					} else {
-						M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-						M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
-					dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
-					hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
-
-					while(any(is.na(dbh2))) {
-						loc <- which(is.na(dbh2))
-						if(any(loc==1)) {
-							M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-							M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
-						} else {
-							M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-							M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
-						dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
-						hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
-					}
-				}}# end of resprout
-
-			if(any(loc==1)) {
-				M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-				M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
-			} else {
-				M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-				M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
-			dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
-			hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
-
-			while(any(is.na(dbh2))) {
-				loc <- which(is.na(dbh2))
-				if(any(loc==1)) {
-					M <- matrix(c(NA,dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-					M2 <- matrix(c(NA,hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)
-				} else {
-					M <- matrix(c(dbh2[loc-1],dbh2[loc+1]),nrow=length(loc),2)
-					M2 <- matrix(c(hom2[loc-1],hom2[loc+1]),nrow=length(loc),2)}
-				dbh2[is.na(dbh2)] <- apply(M,1,mean,na.rm=T)
-				hom2[is.na(hom2)] <- apply(M2,1,mean,na.rm=T)
-			}}# end of missing loop
-		if (any(is.na(hom2))) { hom2[is.na(hom2)] <- 1.3}
-
-		# Apply Cushman's correction to trees with POM changed
-		if (taper.correction & any(hom2 > 1.3)) {
-			ifelse(any(grepl("R",DF$codes)),ind1 <- 1:(grep("R",DF$codes)[1]-1),ind1 <-  which(DF$status!="D"))
-			dbh2[ind1] <- round(dbh2[ind1]*exp(0.0247*(hom2[ind1]-1.3)),1)
-			# dbh2[DF$status=="D"] <- tail(dbh2[DF$status=="A" & !is.na(dbh2)],1)  # replicate last dbh to dead trees
-			hom2 <- rep(1.3,nrow(DF))
-		}}
-
-	return(list(dbh2,hom2))
-}
 
 #' Load object
 #' @author Ervan Rutishauser (er.rutishauser@gmail.com)
@@ -512,17 +533,19 @@ assign.status <- function(DF) {
 #' @description Creat a grid where all trees are allocated to a given quadrat of size (= grid size).
 #' @param census a data.frame where trees have relative X-Y coordinates.
 #' @param grid_size the size of the grid (in meter)
+#' @param x the identifier of X coordinates (i.e. 'gx')
+#' @param y the identifier of Y coordinates (i.e. 'gy')
 #' @return add three columns to the data.frame: quadrat's number, centroids X and Y.
 #' @export
 
-create.quadrats=function(census,grid_size) {
-	X <- census[,grep("x",names(census)),with = FALSE][[1]]
-	Y <- census[,grepl("y\\b",names(census)),with = FALSE][[1]]
+create.quadrats=function(census,grid_size,x="gx",y="gy") {
+	X <- census[,grep(x,names(census)),with=F][[1]]
+	Y <- census[,grep(y,names(census)),with=F][[1]]
 	if (any(is.na(X))){
 		warning(paste(length(X[is.na(X)])," trees without coordinates were discarded."))
-		census <- census[!is.na(X)]
-		X <- census[,grep("x",names(census)),with = FALSE][[1]]
-		Y <- census[,grepl("y\\b",names(census)),with = FALSE][[1]]
+		census <- census[!is.na(X),]
+		X <- census[,grep(x,names(census)),with=F][[1]]
+		Y <- census[,grep(y,names(census)),with=F][[1]]
 	}
 	minx=0
 	miny=0
@@ -560,4 +583,36 @@ create.quadrats=function(census,grid_size) {
 	census$centroY<-(floor(y1/grid_size)*grid_size)+(grid_size/2)
 	# census[,.(max(gx)-min(gx),max(gy)-min(gy)),by=quad]
 	return(census)
+}
+
+#' Unbiased recruitment flux
+#' @author Helene Muller-Laudau (hmullerlandau@gmail.com )
+#' @description Compute unbiased recruitment rate (i.e. account for unmeasured recruitment)
+#' @param A0 biomass at initial census.
+#' @param A1 biomass of alive trees at final census.
+#' @param S1 initial biomass of individuals that survived to time t
+#' @param time cenusus interval in year
+#' @return absolute recruitment flux in % per year
+#' @export
+
+rec.flux <- function(A0,A1,S1,area,time) {
+	rec <- log(A1/S1)*(A1-A0)/(area*time*log(A1/A0))
+	ifelse(rec==Inf,0,rec)
+	return(rec)
+}
+
+#' Unbiased loss flux
+#' @author Helene Muller-Laudau (hmullerlandau@gmail.com )
+#' @description Compute unbiased recruitment rate (i.e. account for unmeasured recruitment)
+#' @param A0 biomass at initial census.
+#' @param A1 biomass of alive trees at final census.
+#' @param S1 initial biomass of individuals that survived to time t
+#' @param time cenusus interval in year
+#' @return absolute recruitment flux in % per year
+#' @export
+
+loss.flux <- function(A0,A1,S1,area,time) {
+	LO <- (log(A0/S1)/log(A1/A0))*((A1-A0)/(area*time))
+	ifelse(LO==Inf,0,LO)
+	return(LO)
 }
