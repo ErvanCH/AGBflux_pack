@@ -20,19 +20,19 @@ data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,max
 	site <- tolower(site)
 	INDEX <- match(tolower(site),site.info$site)
 	if (is.na(INDEX)) {			stop("Site name should be one of the following: \n",paste(levels(factor(site.info$site)),collapse=" - ")) }
-
+	
 	if(missing(DATA_path)){
 		DATA_path <- paste0(path_folder,"/data/")
 	}
-
+	
 	files <-list.files(DATA_path)
 	ifelse(stem,files <- files[grep("stem",files)], files <- files [grep("full",files)])
 	ifelse(!dir.exists(file.path(paste0(path_folder,"/output"))), dir.create(file.path(paste0(path_folder,"/output"))), FALSE)
-
-
+	
+	
 	# Create the receiving data.frame
 	df <- data.frame("treeID"=NA, "stemID"=NA, "tag"=NA, "StemTag"=NA, "sp"=NA, "quadrat"=NA, "gx"=NA, "gy"=NA,"dbh"=NA,"hom"=NA, "ExactDate"=NA, "DFstatus"=NA, "codes"=NA, "date"=NA, "status"=NA,"CensusID"=NA)
-
+	
 	for (i in 1:length(files)) {
 		temp <- LOAD(paste(DATA_path,files[i],sep="/"))
 		temp$CensusID <- i
@@ -41,21 +41,21 @@ data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,max
 	}
 	rm(temp)
 	df <- data.table(df[-1,])
-
-	df <- system.time(data.correction(df,taper.correction,fill.missing))
+	
+	df <- data.correction(df,taper.correction,fill.missing)
 	print("Step 1: data correction done.")
-
+	
 	df <- computeAGB(df,site,palm,DATA_path)
 	print("Step 2: AGB calculation done.")
-
+	
 	DF <- format.interval(df,strangler)
 	print("Step 3: data formating done.")
-
+	
 	DF <- flag.errors(DF,site,strangler=strangler,maxrel=maxrel,draw.graph=draw.graph,output.errors=output.errors,exclude.interval=exclude.interval)
 	print("Step 4: errors flagged. Saving corrected data into /output folder.")
-
+	
 	save(DF,file=paste0(path_folder,"/output/",site,"_census_intervals_10perc.Rdata"))
-
+	
 	rm(list=setdiff(ls(), c("DF","path_folder","SITE", lsf.str())))
 	return(DF)
 }
@@ -108,7 +108,6 @@ data.correction <- function(df,taper.correction,fill.missing) {
 corDBH <- function(DF,taper.correction,fill.missing) {
 	hom2 <-  round(as.numeric(DF$hom)*100)/100
 	dbh2 <-  DF$dbh
-	eval(
 	if (!all(is.na(dbh2))) { # if all DBH are NA -> can't do much -> much be discarded
 		if (fill.missing & any(is.na(dbh2)))  { # Feel gap for missing DBH with average between prior and next census
 			loc <- which(is.na(dbh2))
@@ -166,8 +165,7 @@ corDBH <- function(DF,taper.correction,fill.missing) {
 			# dbh2[DF$status=="D"] <- tail(dbh2[DF$status=="A" & !is.na(dbh2)],1)  # replicate last dbh to dead trees
 			hom2 <- rep(1.3,nrow(DF))
 		}}
-	
-	return(list(dbh2,hom2))
+		return(list(dbh2,hom2))
 }
 
 #' Biomass computation
@@ -183,10 +181,10 @@ computeAGB <- function(df,site,palm=T,DATA_path) {
 	requireNamespace("data.table", quietly = TRUE)
 	## Allocate wood density
 	df$wsg <- density.ind(df=df,site,wsg=WSG)
-
+	
 	# Compute biomass
 	df$agb <- AGB.comp(site,df$dbh2, df$wsg,H = NULL)
-
+	
 	# Compute biomass for palms
 	if (palm) {
 		SP <-  LOAD(paste(DATA_path,list.files(DATA_path)[grep("spptable",list.files(DATA_path))],sep="/"))
@@ -224,7 +222,7 @@ format.interval <- function(df,strangler) {
 	requireNamespace("data.table", quietly = TRUE)
 	# Receiveing data set
 	DF <- data.table("treeID"=NA,"dbh1"=NA,"dbhc1"=NA,"status1"=NA,"code1"=NA,"hom1"=NA,"agb1"=NA,"date1"=NA,"dbh2"=NA,"dbhc2"=NA,"status2"=NA,"code2"=NA,"hom2"=NA,"agb2"=NA,"agbl"=NA,"date2"=NA,"interval"=NA,"year"=NA)
-
+	
 	YEAR <- levels(factor(df$year))
 	for (j in 1:(length(YEAR)-1)) {  # 4 minutes to run
 		i1 <- df[year==YEAR[j] & status1 != "D", .I[which.max(dbh2)], by = treeID] # keep only information for the biggest stem per treeID
@@ -233,17 +231,17 @@ format.interval <- function(df,strangler) {
 		B1 <- df[year==YEAR[j] & status1 != "D",list("agb1"=sum(agb,na.rm=T),"date1"=mean(date,na.rm=T)),by=treeID]
 		BB <- merge(B1,A1,by="treeID",all.x=T)
 		cens1 <- BB[,c("treeID","dbh1","dbhc1","status1","code1","hom1","agb1","date1")]
-
-
+		
+		
 		i2 <- df[year==YEAR[j+1] & status1 != "D", .I[which.max(dbh2)], by = treeID]
 		A2 <- df[i2$V1,c("treeID","dbh","dbh2","codes","hom","status1")]
 		names(A2) <- c("treeID","dbh2","dbhc2","code2","hom2","status2")
-
+		
 		B2 <- df[year==YEAR[j+1],list("agb2"=sum(agb[status1!="D"],na.rm=T),"agbl"=sum(agb[status1=="D"],na.rm=T),"date2"=mean(date,na.rm=T)),by=treeID]
 		BB <- merge(B2,A2,by="treeID",all.x=T)
 		cens2 <- BB[,c("treeID","dbh2","dbhc2","status2","code2","hom2","agb2","agbl","date2")]
 		cens2 <- within(cens2,status2[is.na(status2)] <- "D")
-
+		
 		ID <- data.table(treeID=unique(c(cens1$treeID,cens2$treeID)))
 		ID <- merge(ID,cens1,by='treeID',all.x=T)
 		ID <- merge(ID,cens2,by='treeID',all.x=T)
@@ -252,44 +250,44 @@ format.interval <- function(df,strangler) {
 		DF <- rbind(DF,ID)
 	}
 	DF <- DF[-1,]
-
+	
 	# Add coordinates & other mandatory information
 	COORD <- df[,.(gx=round(10*gx[!is.na(gx)])/10,gy=round(10*gy[!is.na(gy)])/10,quadrat=quadrat,name=name,sp=sp),by=treeID]
 	COORD <- unique(COORD[!duplicated(COORD$treeID)])
 	DF <- merge(DF,COORD,by="treeID",all.x=T)
-
+	
 	# Add average date of census when missing
 	DATE <- DF[,.(date1=mean(date1,na.rm=T),date2=mean(date2,na.rm=T)),by=year]
 	DF <- within(DF,date1[is.na(date1)] <- DATE$date1[match(DF[is.na(date1),"year"]$year,DATE$year)])
 	DF$int <- (DF$date2 - DF$date1)/365.5  # census interval in days
-
+	
 	# Update status for recruited trees
 	DF[, nrow := seq_len(.N), by = treeID]
 	DF <- within(DF,status1[is.na(status1) & !is.na(dbh2) & nrow==1] <- "P")  # recruited trees or Z code (=?)
 	DF[,nrow:= NULL]
-
+	
 	# Assign status
 	DF[, c("code","dHOM") := assign.status(.SD), by=treeID]
-
+	
 	# Remove unnecessary rows
 	DF[code=="D", nrow := seq_len(.N), by = treeID]
 	DF <- within(	DF,nrow[is.na(nrow)] <- 0)
 	DF <- 	DF[nrow<2,]  # keeps only 1 line for dead trees
 	DF[,"nrow":=NULL]
-
+	
 	# Compute annualized fluxes
 	DF[code%in%c("A","AC"),prod.g := (agb2-agb1)/int,by=treeID] # annual prod for alive trees
 	DF[code%in%c("R","Rsp"),prod.r:=agb2/int,by=treeID] # annual prod for resprouts and recruits
 	DF[code=="D",agbl:= agb1,]
 	DF[,loss:=agbl/int,by=treeID] # annualized loss for dead trees
 	
-
-	# Flag strangler figs
+	
+	# Flag large strangler figs
 	if(strangler) {
 		DF$ficus <- 0
 		ficus$name <- paste(ficus$Genus,ficus$Species,sep=" ")
 		FIC <- match(DF$name,ficus$name[ficus$Strangler=="Yes"])
-		DF <- within(DF,ficus[!is.na(FIC)]<-1)
+		DF <- within(DF,ficus[!is.na(FIC) & dbhc1>500]<-1)
 	}
 	return(DF)
 }
@@ -314,53 +312,53 @@ flag.errors <- function(DF,site,strangler,maxrel,draw.graph,output.errors,exclud
 	DF[,error:=0]
 	DF <- within(DF,error[prod.rel>maxrel & dHOM==0 & code!="D"] <- 1)
 	DF <- within(DF,error[prod.rel<(-maxrel) & dHOM==0 & code!="D"] <- -1)
-
+	
 	# Flag census after a major error
 	POSI <- DF[,.I[error!=0]+1,]
 	POSI2 <- DF[POSI,.I[error==0 & dHOM==0],]
 	DF <- within(DF,error[POSI[POSI2]] <- 2) # flag consecutive census
 	ID <- DF[error!=0 & !code%in%c("D","R"),nrow(.SD)>1,by=treeID]
 	ID <- ID$treeID[ID$V1]
-  if (length(ID)/12 > 10) {
-  A <- 	menu(c("Y", "N"), title="There are more than 144 trees (10 pages) to be printed. Do you want to print all?") 
-  ifelse(A==1,draw.graph<-T,draw.graph<-F)
-  }
+	if (length(ID)/12 > 10) {
+		A <- 	menu(c("Y", "N"), title="There are more than 144 trees (10 pages) to be printed. Do you want to print all?") 
+		ifelse(A==1,draw.graph<-T,draw.graph<-F)
+	}
 	if(draw.graph ) { # Plot trees with large major error
-			YEAR <- levels(factor(DF$year))
-			CX=2
-			a=0
-			i = 0
-			GRAPH = list()
-	
-			for (n in 1:length(ID)){
-				i = i + 1
-				DF[,year:=as.numeric(year)]
-				X <- DF[treeID==ID[n] & !code%in%c("R")][order(year)]
-				X$point <- 0
-				X$point[X$error!=0] <- 1
-				Y <- DF[treeID==ID[n] & !code%in%c("D","R")][order(year)]
-				YY <- Y[,.(year=max(year),name=unique(name),d2=dbhc2[year==max(year)],d02=dbh2[year==max(year)],hom2=hom2[year==max(year)]),by=treeID]
-				Y$line <- 0
-				Y$line[Y$dHOM==0] <- 1
-				Y$point <- 0
-				Y$point[Y$error!=0] <- 1
-	     
-				GRAPH[[i]] = ggplot(X,aes(x=year,y=dbhc1)) + geom_point(size=2) + geom_segment(data=Y,aes(x=year,y=dbhc1,xend=year+5,yend=dbhc2,linetype=as.factor(line))) + geom_point(data=X[point==1],aes(x=year+5,y=dbhc2),col=2)	+ labs(title=paste0(unique(X$name)," (",ID[n],")"), x=" ",y="dbh (mm)") + geom_text(data=Y,aes(x=year,y=dbh1-(0.05*dbh1)),label=round(Y$hom1,2),cex=CX)	+ geom_text(data=YY,aes(x=year+5,y=d02-(0.05*d02)),label=round(YY$hom2,2),cex=CX) + geom_text(data=Y,aes(x=year,y=0.3*max(dbhc2)),label=Y$dbh1,cex=CX,angle=90,vjust=1) + geom_text(data=YY,aes(x=year+5,y=0.3*max(d2)),label=YY$d02,cex=CX,angle=90,vjust=1) + theme(plot.title = element_text(size=5*CX,face="bold"),axis.title.y= element_text(size=5*CX,,face="bold"),axis.text.y = element_text(size=4*CX),axis.text.x = element_text(size=4*CX,vjust=0,angle=30),panel.background = element_blank(),strip.text = element_text(size = 4*CX,face="bold"),strip.background = element_rect("lightgrey"),panel.spacing = unit(0.1, "lines")) + scale_linetype_manual(values=c('0'="dashed",'1'="solid")) + guides(linetype=F,colour=F) + scale_x_continuous(limits=c(min(as.numeric(YEAR))-3,max(as.numeric(YEAR))+3),breaks = as.numeric(YEAR)) + scale_y_continuous(limits=c(0.2*max(YY$d2),max(X$dbhc2,X$dbhc1)))
-				
-				
-		if (i %% 15 == 0) { ## print 8 plots on a page
+		YEAR <- levels(factor(DF$year))
+		CX=2
+		a=0
+		i = 0
+		GRAPH = list()
+		
+		for (n in 1:length(ID)){
+			i = i + 1
+			DF[,year:=as.numeric(year)]
+			X <- DF[treeID==ID[n] & !code%in%c("R")][order(year)]
+			X$point <- 0
+			X$point[X$error!=0] <- 1
+			Y <- DF[treeID==ID[n] & !code%in%c("D","R")][order(year)]
+			YY <- Y[,.(year=max(year),name=unique(name),d2=dbhc2[year==max(year)],d02=dbh2[year==max(year)],hom2=hom2[year==max(year)]),by=treeID]
+			Y$line <- 0
+			Y$line[Y$dHOM==0] <- 1
+			Y$point <- 0
+			Y$point[Y$error!=0] <- 1
+			
+			GRAPH[[i]] = ggplot(X,aes(x=year,y=dbhc1)) + geom_point(size=2) + geom_segment(data=Y,aes(x=year,y=dbhc1,xend=year+5,yend=dbhc2,linetype=as.factor(line))) + geom_point(data=X[point==1],aes(x=year+5,y=dbhc2),col=2)	+ labs(title=paste0(unique(X$name)," (",ID[n],")"), x=" ",y="dbh (mm)") + geom_text(data=Y,aes(x=year,y=dbh1-(0.05*dbh1)),label=round(Y$hom1,2),cex=CX)	+ geom_text(data=YY,aes(x=year+5,y=d02-(0.05*d02)),label=round(YY$hom2,2),cex=CX) + geom_text(data=Y,aes(x=year,y=0.3*max(dbhc2)),label=Y$dbh1,cex=CX,angle=90,vjust=1) + geom_text(data=YY,aes(x=year+5,y=0.3*max(d2)),label=YY$d02,cex=CX,angle=90,vjust=1) + theme(plot.title = element_text(size=5*CX,face="bold"),axis.title.y= element_text(size=5*CX,,face="bold"),axis.text.y = element_text(size=4*CX),axis.text.x = element_text(size=4*CX,vjust=0,angle=30),panel.background = element_blank(),strip.text = element_text(size = 4*CX,face="bold"),strip.background = element_rect("lightgrey"),panel.spacing = unit(0.1, "lines")) + scale_linetype_manual(values=c('0'="dashed",'1'="solid")) + guides(linetype=F,colour=F) + scale_x_continuous(limits=c(min(as.numeric(YEAR))-3,max(as.numeric(YEAR))+3),breaks = as.numeric(YEAR)) + scale_y_continuous(limits=c(0.2*max(YY$d2),max(X$dbhc2,X$dbhc1)))
+			
+			
+			if (i %% 15 == 0) { ## print 8 plots on a page
 				a=a+1	
 				plot(do.call(grid.arrange,  GRAPH))
 				ggsave(do.call(grid.arrange,  GRAPH),file=paste0(path_folder,"/output/trees_with_major_errors_",a,".pdf"),width = 29.7, height = 20.1, units = "cm")
 				GRAPH = list() # reset plot
 				i = 0 # reset index
-				}}
-				} # end of graph 
-			
-		if (length(ID)==0){ 
-			print(paste0("No tree productivity above",maxrel, "% or below",-maxrel,"% of mean productivity at your plot. You may eventually want to try a lower threshold.")) 
-			}
-		if (output.errors & length(ID)>0){
+			}}
+	} # end of graph 
+	
+	if (length(ID)==0){ 
+		print(paste0("No tree productivity above",maxrel, "% or below",-maxrel,"% of mean productivity at your plot. You may eventually want to try a lower threshold.")) 
+	}
+	if (output.errors & length(ID)>0){
 		write.csv(DF[treeID%in%ID],file=paste0(path_folder,"/output/trees_with_major_errors.csv"))
 	}
 	return(DF)
@@ -418,14 +416,14 @@ normal.stat <-function(X) {
 	STAT <- X$status
 	if (any(is.na(X$dbh))|any(grep("D",X$status))) {
 		locA <- which(X$status=="A" & !is.na(X$dbh))
-			if (length(locA)!=0) {
-				if(any(grep("D",STAT[1:min(locA)]))) {
-					STAT[is.na(X$dbh)][1:min(locA)-1] <- "P" }
-				if(any(grep("D",STAT[min(locA):max(locA)]))) { #
-					STAT[min(locA):max(locA)] <- "A" }
-				if (all(is.na(X$dbh[(max(locA)+1):nrow(X)]))) {
-					STAT[(max(locA)+1):nrow(X)] <- "D" }
-			}
+		if (length(locA)!=0) {
+			if(any(grep("D",STAT[1:min(locA)]))) {
+				STAT[is.na(X$dbh)][1:min(locA)-1] <- "P" }
+			if(any(grep("D",STAT[min(locA):max(locA)]))) { #
+				STAT[min(locA):max(locA)] <- "A" }
+			if (all(is.na(X$dbh[(max(locA)+1):nrow(X)]))) {
+				STAT[(max(locA)+1):nrow(X)] <- "D" }
+		}
 		STAT[X$status=="V"]<- "V"
 	}
 	return(STAT)
@@ -539,13 +537,13 @@ assign.status <- function(DF) {
 #' @export
 
 create.quadrats=function(census,grid_size,x="gx",y="gy") {
-	X <- census[,grep(x,names(census)),with=F][[1]]
-	Y <- census[,grep(y,names(census)),with=F][[1]]
+	X <- census[,grep(x,names(census)),with=F]
+	Y <- census[,grep(y,names(census)),with=F]
 	if (any(is.na(X))){
 		warning(paste(length(X[is.na(X)])," trees without coordinates were discarded."))
 		census <- census[!is.na(X),]
-		X <- census[,grep(x,names(census)),with=F][[1]]
-		Y <- census[,grep(y,names(census)),with=F][[1]]
+		X <- census[,grep(x,names(census)),with=F]
+		Y <- census[,grep(y,names(census)),with=F]
 	}
 	minx=0
 	miny=0
@@ -557,23 +555,23 @@ create.quadrats=function(census,grid_size,x="gx",y="gy") {
 	y1=Y
 	y1[Y<=0]=0.1
 	y1[Y==maxy]=maxy-0.1
-
+	
 	# specify grid size for division into quadrats
 	w_grid = ceiling(maxx)/grid_size;
 	h_grid = ceiling(maxy)/grid_size;
 	n_quadrat = w_grid*h_grid;
-
+	
 	# for now, only allow grid sizes that fit neatly
 	if ( round(w_grid) != w_grid | round(h_grid) != h_grid )
 	{
 		stop('Plot width and height must be divisible by grid_size');
 	}
-
+	
 	if ( max(X,na.rm=T) > maxx | min(X,na.rm=T) < 0 | max(Y,na.rm=T) > maxy | min(Y,na.rm=T) < 0 )
 	{
 		stop('Some trees are outside the plot boundaries')
 	}
-
+	
 	census$quad<-(ceiling((maxy-miny)/grid_size))*(floor((x1-minx)/grid_size))+(floor((y1-miny)/grid_size)+1)   ## identifiant de cellule unique 1->100 en partant de 0,0
 	if ( max(census$quad,na.rm=T) != n_quadrat )
 	{
