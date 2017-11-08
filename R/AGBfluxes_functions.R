@@ -69,24 +69,24 @@ data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,max
 #' @export
 data.correction <- function(df,taper.correction,fill.missing) {
 	requireNamespace("data.table", quietly = TRUE)
-	df <- df[!status%in%c("P","V"),] # discard all priors & vanished trees
+	df <- df[!status%in%c("P","V")] # discard all priors & vanished trees
 	df[,"id" :=paste(treeID,stemID,sep="-")] # creat a unique tree-stem ID
 	df <- df[order(id,CensusID)]
-	df[,status1:=normal.stat(.SD),by=id]
+	df[,status1:=normal.stat(.SD),by=id] # check that the status is consistent over all censuses (e.g. can't be dead and alive at next census)
 	
-	df[status1=="M", nrow2 := seq_len(.N), by = id]
+	df[status1=="M", nrow2 := seq_len(.N), by = id] # multiple missing trees are considered as dead at first occurrence
 	df <- within(df,nrow2[is.na(nrow2)] <- 0)
-	df <- within(df,status1[nrow2==1] <- "D") # multiple missing trees are considered as dead at first occurrence
-	df <- df[nrow2<2]  # keeps only 1 line for dead trees
+	df <- within(df,status1[nrow2==1] <- "D") 
+	df <- df[nrow2<2]  # keeps only the last occurence for missing trees
 	
-	df[status1=="D", nrow := seq_len(.N), by = id]
+	df[status1=="D", nrow := seq_len(.N), by = id] # same for dead trees
 	df <- within(df,nrow[is.na(nrow)] <- 0)
-	df <- df[nrow<2,]  # keeps only 1 line for dead trees
+	df <- df[nrow<2,]  # keeps only the last occurence for dead trees
 	df[,c("nrow","nrow2"):=NULL]
 	
 	df[,year:=round(mean(as.numeric(substr(ExactDate,1,4)),na.rm=T)),by=CensusID] # Assign 1 year per census
 	NO.MEASURE <- df[,all(is.na(dbh)),by=id]
-	df <- df[!id%in%NO.MEASURE$treeID[NO.MEASURE$V1]] # remove stems without any measure
+	df <- df[!id%in%NO.MEASURE$treeID[NO.MEASURE$V1]] # remove stems without any measurement
 	
 	# Taper correction or missing values: -> fill gaps for missing values
 	df[, c("dbh2","hom2") := corDBH(.SD,taper.correction=taper.correction,fill.missing=fill.missing), by=id] # might be time consuming (4 minutes for BCI)
@@ -197,14 +197,14 @@ computeAGB <- function(df,site,palm=T,DATA_path) {
 			names(SP) <- c("sp","genus","species","Family","name")
 			df <- merge(df,SP,by="sp",all.x=T)
 			agbPalm <- function(D) { exp(-3.3488 + 2.7483*log(D/10) + ((0.588)^2)/2)/1000 }
-			df['Family'=="Arecaceae",agb:= agbPalm(dbh2)]
+			df['Family'=="Arecaceae","agb":= agbPalm(dbh2)]
 		} else {
 			SP <- SP[,c("sp","Genus","Species","Family")]
 			SP$name <- paste(SP$Genus,SP$Species,sep=" ")
 			names(SP) <- c("sp","genus","species","Family","name")
 			df <- merge(df,SP,by="sp",all.x=T)
 			agbPalm <- function(D) { exp(-3.3488 + 2.7483*log(D/10) + ((0.588)^2)/2)/1000 }
-			df['Family'=="Arecaceae",agb:= agbPalm(dbh2)]
+			df['Family'=="Arecaceae","agb":= agbPalm(dbh2)]
 		}
 	}
 	return(df)
@@ -225,13 +225,12 @@ format.interval <- function(df,strangler) {
 	
 	YEAR <- levels(factor(df$year))
 	for (j in 1:(length(YEAR)-1)) {  # 4 minutes to run
-		i1 <- df[year==YEAR[j] & status1 != "D", .I[which.max(dbh2)], by = treeID] # keep only information for the biggest stem per treeID
+		i1 <- df[year==YEAR[j] & status1 != "D", .I[which.max(dbh2)], by = treeID] # keep only information for the biggest alive stem per treeID
 		A1 <- df[i1$V1,c("treeID","dbh","dbh2","status1","codes","hom")]
 		names(A1) <- c("treeID","dbh1","dbhc1","status1","code1","hom1")
 		B1 <- df[year==YEAR[j] & status1 != "D",list("agb1"=sum(agb,na.rm=T),"date1"=mean(date,na.rm=T)),by=treeID]
 		BB <- merge(B1,A1,by="treeID",all.x=T)
 		cens1 <- BB[,c("treeID","dbh1","dbhc1","status1","code1","hom1","agb1","date1")]
-		
 		
 		i2 <- df[year==YEAR[j+1] & status1 != "D", .I[which.max(dbh2)], by = treeID]
 		A2 <- df[i2$V1,c("treeID","dbh","dbh2","codes","hom","status1")]
@@ -259,6 +258,7 @@ format.interval <- function(df,strangler) {
 	# Add average date of census when missing
 	DATE <- DF[,.(date1=mean(date1,na.rm=T),date2=mean(date2,na.rm=T)),by=year]
 	DF <- within(DF,date1[is.na(date1)] <- DATE$date1[match(DF[is.na(date1),"year"]$year,DATE$year)])
+	DF <- within(DF,date2[is.na(date2)] <- DATE$date2[match(DF[is.na(date2),"year"]$year,DATE$year)])
 	DF$int <- (DF$date2 - DF$date1)/365.5  # census interval in days
 	
 	# Update status for recruited trees
