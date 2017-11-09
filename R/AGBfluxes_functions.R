@@ -42,7 +42,7 @@ data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,max
 	rm(temp)
 	df <- data.table(df[-1,])
 	
-	df <- data.correction(df,taper.correction,fill.missing)
+	df <- data.correction(df,taper.correction,fill.missing,stem)
 	print("Step 1: data correction done.")
 	
 	df <- computeAGB(df,site,palm,DATA_path)
@@ -65,28 +65,27 @@ data.prep <- function(site,stem,taper.correction,fill.missing,palm,strangler,max
 #' @description Stack all censuses together and correct DBH, if required
 #' @param taper.correction TRUE or FALSE, are you willing to apply Cushman et al (2014) taper correction?
 #' @param fill.missing TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?
+#' @param stem is the function applied over stem (stem=TRUE) or tree (stem=FALSE) data?
 #' @return a data.table (data.frame) with all relevant variables.
 #' @export
-data.correction <- function(df,taper.correction,fill.missing) {
+data.correction <- function(df,taper.correction,fill.missing,stem) {
 	requireNamespace("data.table", quietly = TRUE)
-	df <- df[!status%in%c("P","V")] # discard all priors & vanished trees
+	if (stem==T) {
 	df[,"id" :=paste(treeID,stemID,sep="-")] # creat a unique tree-stem ID
 	df <- df[order(id,CensusID)]
+	} else { df[,"id" := treeID]}
 	df[,status1:=normal.stat(.SD),by=id] # check that the status is consistent over all censuses (e.g. can't be dead and alive at next census)
+	df <- df[!status1%in%c("P","Dr")] # discard all priors & replicated dead trees
 	
-	df[status1=="M", nrow2 := seq_len(.N), by = id] # multiple missing trees are considered as dead at first occurrence
-	df <- within(df,nrow2[is.na(nrow2)] <- 0)
-	df <- within(df,status1[nrow2==1] <- "D") 
-	df <- df[nrow2<2]  # keeps only the last occurence for missing trees
+	# remove replicated dead trees (outdated)
+	# df[status1=="D", nrow := seq_len(.N), by = id] # same for dead trees
+	# df <- within(df,nrow[is.na(nrow)] <- 0)
+	# df <- df[nrow<2,]  # keeps only the first occurence for dead trees
+	# df[,c("nrow","nrow2"):=NULL]
 	
-	df[status1=="D", nrow := seq_len(.N), by = id] # same for dead trees
-	df <- within(df,nrow[is.na(nrow)] <- 0)
-	df <- df[nrow<2,]  # keeps only the last occurence for dead trees
-	df[,c("nrow","nrow2"):=NULL]
-	
-	df[,year:=round(mean(as.numeric(substr(ExactDate,1,4)),na.rm=T)),by=CensusID] # Assign 1 year per census
+	# remove stems without any measurement
 	NO.MEASURE <- df[,all(is.na(dbh)),by=id]
-	df <- df[!id%in%NO.MEASURE$treeID[NO.MEASURE$V1]] # remove stems without any measurement
+	df <- df[!id%in%NO.MEASURE$treeID[NO.MEASURE$V1]] 
 	
 	# Taper correction or missing values: -> fill gaps for missing values
 	df[, c("dbh2","hom2") := corDBH(.SD,taper.correction=taper.correction,fill.missing=fill.missing), by=id] # might be time consuming (4 minutes for BCI)
@@ -106,8 +105,8 @@ data.correction <- function(df,taper.correction,fill.missing) {
 #' @return a data.table (data.frame) with all relevant variables.
 #' @export
 corDBH <- function(DF,taper.correction,fill.missing) {
-	hom2 <-  round(as.numeric(DF$hom)*100)/100
-	dbh2 <-  DF$dbh
+	hom2 <-  round(as.numeric(DF[status1=="A","hom"][[1]])*100)/100
+	dbh2 <-  DF[status1=="A","dbh"][[1]]
 	if (!all(is.na(dbh2))) { # if all DBH are NA -> can't do much -> much be discarded
 		if (fill.missing & any(is.na(dbh2)))  { # Feel gap for missing DBH with average between prior and next census
 			loc <- which(is.na(dbh2))
@@ -165,7 +164,12 @@ corDBH <- function(DF,taper.correction,fill.missing) {
 			# dbh2[DF$status=="D"] <- tail(dbh2[DF$status=="A" & !is.na(dbh2)],1)  # replicate last dbh to dead trees
 			hom2 <- rep(1.3,nrow(DF))
 		}}
-		return(list(dbh2,hom2))
+		
+	if (any(grep("D",DF$status1))) { # add NA at time of death
+		dbh2 <- c(dbh2,NA)
+		hom2 <- c(hom2,NA)
+	}
+	return(list(dbh2,hom2))
 }
 
 #' Biomass computation
@@ -220,6 +224,9 @@ computeAGB <- function(df,site,palm=T,DATA_path) {
 
 format.interval <- function(df,strangler) {
 	requireNamespace("data.table", quietly = TRUE)
+	
+	df[,year:=round(mean(as.numeric(substr(ExactDate,1,4)),na.rm=T)),by=CensusID] # Assign 1 year per census
+	
 	# Receiveing data set
 	DF <- data.table("treeID"=NA,"dbh1"=NA,"dbhc1"=NA,"status1"=NA,"code1"=NA,"hom1"=NA,"agb1"=NA,"date1"=NA,"dbh2"=NA,"dbhc2"=NA,"status2"=NA,"code2"=NA,"hom2"=NA,"agb2"=NA,"agbl"=NA,"date2"=NA,"interval"=NA,"year"=NA)
 	
@@ -405,26 +412,29 @@ loess.fun <- function(x,var,range,alpha=NULL)  {
 # 	pred <- predict(fit,newdata=list(lAGB=Xrange))
 # 	return(data.frame(lAGB=Xrange,y=as.numeric(pred)))
 # }
+
 #' Normalized tree status
 #' @author Ervan Rutishauser (er.rutishauser@gmail.com)
 #' @description Check the consistency of stem/tree status over time (i.e. a tree that is 'alive' at last census can not be 'dead' inbetween)
 #' @param x a data.table
-#' @return a data.table (data.frame) with all relevant variables.
+#' @return a data.table (data.frame) with a new colum "status1" where values can be "P"(prior),"A"(alive),"D"(dead) and "Dr"(dead replicated).
 #' @export
+#' 
 
 normal.stat <-function(X) {
-	STAT <- X$status
-	if (any(is.na(X$dbh))|any(grep("D",X$status))) {
+	STAT <- rep("A",nrow(X))
+	if (all(is.na(X$dbh))) {
+		STAT <- rep("Dr",nrow(X))
+	} else if (any(is.na(X$dbh))|any(grep("\\bD\\b",X$status))) { # look for dbh=NA or dead (D) status
 		locA <- which(X$status=="A" & !is.na(X$dbh))
 		if (length(locA)!=0) {
-			if(any(grep("D",STAT[1:min(locA)]))) {
-				STAT[is.na(X$dbh)][1:min(locA)-1] <- "P" }
-			if(any(grep("D",STAT[min(locA):max(locA)]))) { #
-				STAT[min(locA):max(locA)] <- "A" }
-			if (all(is.na(X$dbh[(max(locA)+1):nrow(X)]))) {
-				STAT[(max(locA)+1):nrow(X)] <- "D" }
+			if (min(locA) >1) {
+				STAT[is.na(X$dbh)][1:min(locA)-1] <- "P" }  # "Prior to be discarded
 		}
-		STAT[X$status=="V"]<- "V"
+		if (max(locA) < nrow(X)) {
+			STAT[(max(locA)+1)] <- "D" }
+		if (max(locA)+2 <= nrow(X)) {
+			STAT[(max(locA)+2):nrow(X)] <- "Dr"	} # Dead replicated to be discarded
 	}
 	return(STAT)
 }
