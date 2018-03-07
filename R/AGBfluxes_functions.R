@@ -43,24 +43,27 @@ data.prep <- function(site,stem,taper.correction,fill.missing,use.palm.allometry
 	rm(temp)
 	table(df$year,df$CensusID)
 	df <- df[-1,]
-
+	
 	df <- data.correction(df,taper.correction,fill.missing,stem)
 	print("Step 1: data correction done.")
 	
-	df <- computeAGB(df,site,palm,DATA_path)
+	site="luquillo"
+	DATA_path <- NULL
+	df <- computeAGB(df,site,palm,DATA_path=NULL)
 	print("Step 2: AGB calculation done.")
 	
 	# save(df,file=paste0(path_folder,"/output/",site,"_rawcensus_corrected.Nov17.Rdata"))
+	# stem=T;taper.correction=T;fill.missing=T;palm=T;flag.stranglers=T;maxrel=0.2;graph.problem.trees=F;output.errors=F;exclude.interval=1;assign("dbh.stranglers",500)
 	# df <- LOAD("C:/Users/Ervan/Documents/Work/R/CTFS/Code_compil/biomass_fluxes_BCI/output/barro colorado island_rawcensus_corrected.Nov17.Rdata")
 	# 
 	DF <- format.interval(df,flag.stranglers,dbh.stranglers)
 	print("Step 3: data formating done.")
 	
-	DF <- flag.errors(DF2,site,flag.stranglers=flag.stranglers,maxrel=maxrel,graph.problem.trees=graph.problem.trees,output.errors=output.errors,exclude.interval=exclude.interval)
+	DF <- flag.errors(DF,site,flag.stranglers=flag.stranglers,maxrel=maxrel,graph.problem.trees=graph.problem.trees,output.errors=output.errors,exclude.interval=exclude.interval)
 	print("Step 4: errors flagged. Saving corrected data into output folder.")
 	
 	save(DF,file=paste0(path_folder,"/output/",site,"_census_intervals_20perc.Rdata"))
-	
+	# save(DF,file=paste0(path_folder,"/output/",site,"_census_intervals_20perc_nobrokenstems.Rdata"))
 	rm(list=setdiff(ls(), c("DF","path_folder","SITE", lsf.str())))
 	return(DF)
 }
@@ -76,8 +79,8 @@ data.prep <- function(site,stem,taper.correction,fill.missing,use.palm.allometry
 #' @export
 data.correction <- function(df,taper.correction,fill.missing,stem) {
 	if (stem) {
-	df[,"id" :=paste(treeID,stemID,sep="-")] # creat a unique tree-stem ID
-	df <- df[order(id,CensusID)]
+		df[,"id" :=paste(treeID,stemID,sep="-")] # creat a unique tree-stem ID
+		df <- df[order(id,CensusID)]
 	} else { df[,"id" := treeID]}
 	
 	df[,status1:=normal.stat(.SD),by=id] # check that the status is consistent over all censuses (e.g. can't be dead and alive at next census)
@@ -112,63 +115,69 @@ data.correction <- function(df,taper.correction,fill.missing,stem) {
 #' @export
 
 # Debug
-# DF <- data.table(dbh=c(45,NA,10,12,NA,15),status1=rep("A",6),hom=c(1.3,NA,3,3,NA,3),codes=c(NA,"R",NA,NA,NA,NA),date=1:6)
 # for (i in levels(factor(df$id))) {
 # 	corDBH(df[id==i],taper.correction==T,fill.missing==T)
 # }
+#   DT <- df[id==i]
 
 corDBH <- function(DT,taper.correction,fill.missing) {
-	dbh2 <- DT[status1=="A",'dbh'][[1]] 
+	dbh2 <- DT[status1=="A",'dbh'][[1]]
 	hom2 <- DT[status1=="A",round(hom*100)/100]   # round hom to be at 1.3 meter (avoiding odd rounding)
 	loc <- which(is.na(dbh2))
 	DATE <- DT[status1=="A","date"][[1]]
 	
 	# 1. Apply Cushman's correction to trees with POM changed
 	if (taper.correction & any(hom2 > 1.3,na.rm=T)) {
-		loc1 <- hom2>1.3 & !is.na(dbh2)
-		dbh2[loc1] <- round(dbh2[loc1]*exp(0.0247*(hom2[loc1]-1.3)),1)
-		hom2[loc1] <- 1.3
+		hom2[is.na(hom2)] <- 1.3
+		if (taper.correction & any(hom2 > 1.3,na.rm=T)) {
+			loc1 <- hom2!=1.3 & !is.na(dbh2)
+			if(!any(is.na(loc1))) {
+				dbh2[loc1] <- round(dbh2[loc1]*exp(0.0247*(hom2[loc1]-1.3)),1)
+				hom2[loc1] <- 1.3
+			}}
 	}
 	
 	# 2. Fill gaps
 	if (fill.missing & any(is.na(dbh2))) {
-	
+		
 		# dead stem
-	if (any(grep("D",DT$status1))) {
+		if (any(grep("D",DT$status1))) {
 			ifelse(length(dbh2)%in%loc,RULE<-2,RULE<-1)  # if last value is NA, last valid DBH measure is replicated (RULE=2)
-		  tryCatch(approx(DATE,dbh2,rule=RULE,xout=DT$date[loc])$y,error=function(e) print(unique(paste("Stem id",DT$id,"generates a problem."))))
+			tryCatch(approx(DATE,dbh2,rule=RULE,xout=DT$date[loc])$y,error=function(e) print(unique(paste("Stem id",DT$id,"generates a problem."))))
 			if(any(is.na(approx(DATE,dbh2,rule=RULE,xout=DATE[loc])$y))) {	print(DT$id)}
 			dbh2[loc] <- approx(DATE,dbh2,rule=RULE,xout=DATE[loc])$y
 			hom2[loc] <- approx(DATE,hom2,rule=RULE,xout=DATE[loc])$y
-
+			
 			dbh2 <- c(dbh2,NA)  # add NA at year of death
 			hom2 <- c(hom2,NA)
-	} # end of dead stems
-	else {
-	 # alive stems	
-		ifelse(length(dbh2)%in%loc,RULE<-2,RULE<-1)  # if last value is NA, last valid BDBH measure is replicated (RULE=2)
+		} # end of dead stems
+		else {
+			# alive stems
+			ifelse(length(dbh2)%in%loc,RULE<-2,RULE<-1)  # if last value is NA, last valid BDBH measure is replicated (RULE=2)
 			tryCatch(approx(DT$date,dbh2,rule=RULE,xout=DT$date[loc])$y,error=function(e) print(paste("Stem id",DT$id,"generates a problem.")))
 			dbh2[loc] <- approx(DT$date,dbh2,rule=RULE,xout=DT$date[loc])$y
 			hom2[loc] <- approx(DT$date,hom2,rule=RULE,xout=DT$date[loc])$y
- } # end of alive stems 
+		} # end of alive stems
 		
-	# Resprouts 
+		# Resprouts
 		RESP <- grep("\\bR\\b",DT$codes[is.na(DT$dbh)])
-	if(length(RESP)>0) {
-		dbh2[RESP] <- NA
-		hom2[RESP] <- 1.30
-			}
-	 
-	} else {# end of fill.missing 
-	
-	# Replicate dbh & hom if no NA values or fill.missing = FALSE
-	dbh2 <- DT[,'dbh'][[1]] 
-	hom2 <- DT[,round(hom*100)/100]
-	if (taper.correction & any(hom2 > 1.3,na.rm=T)) {
-		loc1 <- hom2>1.3 & !is.na(dbh2)
-		dbh2[loc1] <- round(dbh2[loc1]*exp(0.0247*(hom2[loc1]-1.3)),1)
-		hom2[loc1] <- 1.3
-	}
+		if(length(RESP)>0) {
+			dbh2[RESP] <- NA
+			hom2[RESP] <- 1.30
+		}
+		
+	} else {# end of fill.missing
+		
+		# Replicate dbh & hom if no NA values or fill.missing = FALSE
+		dbh2 <- DT[,'dbh'][[1]]
+		hom2 <- DT[,round(hom*100)/100]
+		hom2[is.na(hom2)] <- 1.3
+		if (taper.correction & any(hom2 > 1.3,na.rm=T)) {
+			loc1 <- hom2!=1.3 & !is.na(dbh2)
+			if(!any(is.na(loc1))) {
+				dbh2[loc1] <- round(dbh2[loc1]*exp(0.0247*(hom2[loc1]-1.3)),1)
+				hom2[loc1] <- 1.3
+			}}
 	} # end if fill.missing = F or no missing dbh
 	return(list(dbh2,hom2))
 }
@@ -183,9 +192,12 @@ corDBH <- function(DT,taper.correction,fill.missing) {
 #' @return a data.table (data.frame) with all relevant variables.
 #' @export
 
-computeAGB <- function(df,site,use.palm.allometry=T,DATA_path) {
+computeAGB <- function(df,site,use.palm.allometry=T,DATA_path=NULL) {
+	if(is.null(DATA_path)){
+		DATA_path <- paste0(path_folder,"/data/")
+	}
 	## Allocate wood density
-	df$wsg <- density.ind(df=df,site,wsg=WSG)
+	df <- density.ind(df=df,site,wsg=WSG)
 	
 	# Compute biomass
 	df$agb <- AGB.comp(site,df$dbh2, df$wsg,H = NULL)
@@ -225,12 +237,11 @@ computeAGB <- function(df,site,use.palm.allometry=T,DATA_path) {
 #' @return a formated data.table.
 #' @export
 
-format.interval <- function(df,flag.stranglers,dbh.stranglers) {
-	df <- LOAD("C:/Users/Ervan/Documents/Work/R/CTFS/Code_compil/biomass_fluxes_BCI/output/barro colorado island_rawcensus_corrected.Nov17.Rdata")
+format.interval <- function(df,flag.stranglers,dbh.stranglers,code.broken=NULL) {
 	YEAR <- unique(df$year)
 	
 	# Receiveing data set
-	DF2 <- data.table("treeID"=NA,"dbh1"=NA,"dbhc1"=NA,"status1"=NA,"code1"=NA,"hom1"=NA,"sp"=NA,"agb1"=NA,"date1"=NA,"dbh2"=NA,"dbhc2"=NA,"status2"=NA,"code2"=NA,"hom2"=NA,"agb2"=NA,"agbl"=NA,"date2"=NA,"interval"=NA,"year"=NA)
+	DF2 <- data.table("treeID"=NA,"dbh1"=NA,"dbhc1"=NA,"status1"=NA,"code1"=NA,"hom1"=NA,"sp"=NA,"agb1"=NA,"date1"=NA,"dbh2"=NA,"dbhc2"=NA,"status2"=NA,"code2"=NA,"hom2"=NA,"agb2"=NA,"agbl"=NA,"date2"=NA,"agb1.surv"=NA,"interval"=NA,"year"=NA)
 	
 	for (j in 1:(length(YEAR)-1)) {  # 4 minutes to run
 		i1 <- df[year==YEAR[j] & status1 != "D", .I[which.max(dbh2)], by = treeID] # keep only information for the biggest alive stem per treeID
@@ -252,10 +263,17 @@ format.interval <- function(df,flag.stranglers,dbh.stranglers) {
 		ID <- merge(ID,cens1,by='treeID',all.x=T)
 		ID <- merge(ID,cens2,by='treeID',all.x=T)
 		
-		ID[,"broken":=ifelse(id1!=id2 & dbhc2<dbhc1-4*(0.0038*dbhc1 + 0.927)  & dbhc1>100 & sp!="oenoma",1,0)] # flag large broken main stems to be added to losses
+		ID[,"broken":=ifelse(id1!=id2 & dbhc2<dbhc1-4*(0.0038*dbhc1 + 0.927) & dbhc1>100 & sp!="oenoma" & hom2<=hom1,1,0)] # flag large broken main stems to be added to losses
 		ID[broken==1,"agbl":=agb]
-		ID[broken==1,"agb1":=agb1-agbl]
-		idx <- ID[broken==1,.I[!grepl("\\bR\\b",code2) ]] 
+		ID[broken==1,"agb1.surv":=agb1-agbl]
+		# ID$broken <- 0  ## when not flaggigng broken stems
+		# ID$agbl <- as.numeric(NA)  ## when not flaggigng broken stems
+		# ID$agb1.surv <- as.numeric(NA)  ## when not flaggigng broken stems
+		if(exists("code.broken")) {
+			idx <- ID[broken==1,.I[!grepl(paste0("\\b",code.broken,"\\b"),code2) ]]	
+		} else { 
+			idx <- ID[broken==1,.I[!grepl("\\bR\\b",code2) ]]
+		}
 		ID[broken==1,] <- within(ID[broken==1,],code2[idx] <- "broken")
 		ID[,c("agb","broken","id1","id2"):=NULL]
 		ID$interval=j
@@ -271,7 +289,7 @@ format.interval <- function(df,flag.stranglers,dbh.stranglers) {
 	
 	# Add average date of census when missing
 	DATE <- df[,.(date=mean(date,na.rm=T)),by=year]
-	DATE$year2 <- seq(1985,2020,5)
+	DATE[,"year2" := c(year[2:length(year)],NA)]
 	DF2 <- within(DF2,date1[is.na(date1)] <- DATE$date[match(DF2[is.na(date1),"year"]$year,DATE$year2)])
 	DF2 <- within(DF2,date2[is.na(date2)] <- DATE$date[match(DF2[is.na(date2),"year"]$year,DATE$year)])
 	DF2$int <- (DF2$date2 - DF2$date1)/365.5  # census interval in days
@@ -292,6 +310,7 @@ format.interval <- function(df,flag.stranglers,dbh.stranglers) {
 	
 	# Compute annualized fluxes
 	DF2[code%in%c("A","AC","B"),prod.g := (agb2-agb1)/int,by=treeID] # annual prod for alive trees & multi-stems
+	DF2[code=="B",prod.g := (agb2-agb1.surv)/int,by=treeID] # annual prod for alive trees & multi-stems
 	DF2[code%in%c("R","Rsp"),prod.r:=agb2/int,by=treeID] # annual prod for resprouts and recruits
 	DF2[code=="D",agbl:= agb1,by=treeID]
 	DF2[,loss:=agbl/int,by=treeID] # annualized loss for dead trees
@@ -335,7 +354,7 @@ flag.errors <- function(DF,site,flag.stranglers,maxrel,graph.problem.trees,outpu
 	DF[,error.loss:=0]
 	DF <- within(DF,error.loss[POSI[POSI2]] <- 1) # flag consecutive census
 	if (flag.stranglers) {
-	DF <- within(DF,error.loss[ficus==1 & code=="D"] <- 1) # flag dead strangler figs	
+		DF <- within(DF,error.loss[ficus==1 & code=="D"] <- 1) # flag dead strangler figs	
 	}
 	ID <- DF[error!=0 & !code%in%c("D","R"),nrow(.SD)>1,by=treeID]
 	ID <- ID$treeID[ID$V1]
@@ -440,6 +459,11 @@ loess.fun <- function(x,var,range,alpha=NULL)  {
 #' 
 
 normal.stat <-function(DT) {
+	if(!"status"%in%names(DT)) {
+		DT$status <- NA
+		DT$status[DT$DFstatus=="alive"] <- "A"
+		DT$status[DT$DFstatus=="dead"] <- "D"
+	}
 	STAT <- rep("A",nrow(DT))
 	if (all(is.na(DT$dbh))) {
 		STAT <- rep("Dr",nrow(DT))
@@ -447,13 +471,13 @@ normal.stat <-function(DT) {
 		locA <- which(DT$status=="A" & !is.na(DT$dbh))
 		if (length(locA)!=0) {
 			if (min(locA) >1) {
-					STAT[is.na(DT$dbh)][1:min(locA)-1] <- "P" }  # Prior (to be discarded)
+				STAT[is.na(DT$dbh)][1:min(locA)-1] <- "P" }  # Prior (to be discarded)
 			if (max(locA) < nrow(DT)) {
 				STAT[(max(locA)+1)] <- "D" }
 			if (max(locA)+2 <= nrow(DT)) {
 				STAT[(max(locA)+2):nrow(DT)] <- "Dr"	} # Dead replicated (to be discarded)
 		} # end of loca>0
-		}
+	}
 	return(STAT)
 }
 
@@ -468,17 +492,26 @@ normal.stat <-function(DT) {
 #' @export
 
 density.ind <- function (df, site, wsgdata, denscol = "wsg") {
-	wsgdatamatch = which(wsgdata$site %in% site.info$wsg.site.name[site.info$site==site])
-	if (length(wsgdatamatch) == 0)
-		stop("Site name doesn't match!")
-	wsgdata = unique(wsgdata[wsgdatamatch, ])
-	meanwsg = mean(subset(wsgdata, idlevel == "species")[, denscol],
-		na.rm = TRUE)
-	m = match(df$sp, wsgdata$sp)
-	result = wsgdata[m, denscol]
-	result[is.na(m)] = meanwsg
-	result[is.na(result)] = meanwsg
-	return(result)
+	#Add genus & species to data
+	SP <-  LOAD(paste(DATA_path,list.files(DATA_path)[grep("spptable",list.files(DATA_path))],sep="/"))
+	SP <- subset(SP,,c("sp","Genus","Species","Family"))
+	SP$name = paste(SP$Genus,SP$Species,sep=" ")
+	
+	# Import & format CTFS wood data base
+	wsgdatamatch = which(WSG$site %in% site.info$wsg.site.name[site.info$site==tolower(site)])
+	if (length(wsgdatamatch) == 0)	stop("Site name doesn't match!")
+	wsg = unique(WSG[wsgdatamatch,c("genus","species","spwood") ])
+	names(wsg) <- c("genus","species","wd")
+	wsg <- wsg[!is.na(wsg$wd),]
+	
+	# Assign WD by taxon
+	A <- getWoodDensity(SP$Genus, SP$Species, stand = rep(site,nrow(SP)), family = NULL, region = "World",addWoodDensityData = wsg)
+	A$name <- paste(A$genus,A$species,sep=" ")
+	
+	SP <- merge(SP,A[,c("name","meanWD")],by="name",all.x=T)
+	names(SP) <- c("name", "sp", "genus", "species", "Family", "wsg")
+	df <- merge(df,subset(SP,,c("sp","wsg")),by="sp",all.x=T)
+	return(df)
 }
 
 #' AGB computation
@@ -541,11 +574,12 @@ LOAD <- function(saveFile) {
 
 assign.status <- function(DT) {
 	code <- rep("A",nrow(DT))
-	code[is.na(DT$dbhc1) & DT$status1=="P"] <- "R"
-	code[DT$code2=="R"] <- "R"
-	code[DT$code2=="broken"] <- "B" # Broken
-	code[is.na(DT$status1) & !is.na(DT$status2)] <- "Rsp"  # resprouted trees poses a problem only the first year, are alive/dead after
-	code[is.na(DT$dbhc2)] <- "D"
+	code[code=="A" & is.na(DT$dbhc1) & DT$status1=="P"] <- "R"
+	code[code=="A" & DT$code2=="R"] <- "R"
+	code[code=="A" & DT$code2=="broken"] <- "B" # Broken
+	code[code=="A" & is.na(DT$status1) & !is.na(DT$status2)] <- "Rsp"  # resprouted trees poses a problem only the first year, are alive/dead after
+	code[code=="A" & grep("MAIN",DT$code1) & grep("SPROUT",DT$code2)] <- "Rsp"  # resprouted trees poses a problem only the first year, are alive/dead after
+	code[DT$status2=="D"] <- "D"  # all dead trees have NA value for DBH
 	if(any(code=="A")){
 		loc <- max(which(code%in%c("A")))
 		if (any(code[1:loc]=="D")) {
@@ -582,10 +616,11 @@ assign.status2 <- function(DT) {
 #' @param grid_size the size of the grid (in meter)
 #' @param x the identifier of X coordinates (i.e. 'gx')
 #' @param y the identifier of Y coordinates (i.e. 'gy')
+#' @param make.squared does the coordinates needs to 
 #' @return add three columns to the data.frame: quadrat's number, centroids X and Y.
 #' @export
 
-create.quadrats=function(census,grid_size,x="gx",y="gy") {
+create.quadrats=function(census,grid_size,x="gx",y="gy",fit.in.plot) {
 	X <- census[,grep(x,names(census)),with=F][[1]]
 	Y <- census[,grep(y,names(census)),with=F][[1]]
 	if (any(is.na(X))){
@@ -598,12 +633,17 @@ create.quadrats=function(census,grid_size,x="gx",y="gy") {
 	miny=0
 	maxx=max(X,na.rm=T)
 	maxy=max(Y,na.rm=T)
+	
+	if(exists("fit.in.plot")) {
+		maxx <- round(max(X)/10)*10
+		maxy <- round(max(Y)/10)*10
+	}
 	x1=X
 	x1[X<=0]=0.1
-	x1[X==maxx]=maxx-0.1
+	x1[X>=maxx]=maxx-0.1
 	y1=Y
 	y1[Y<=0]=0.1
-	y1[Y==maxy]=maxy-0.1
+	y1[Y>=maxy]=maxy-0.1
 	
 	# specify grid size for division into quadrats
 	w_grid = ceiling(maxx)/grid_size;
@@ -611,14 +651,13 @@ create.quadrats=function(census,grid_size,x="gx",y="gy") {
 	n_quadrat = w_grid*h_grid;
 	
 	# for now, only allow grid sizes that fit neatly
+	if ( max(x1,na.rm=T) > maxx | min(x1,na.rm=T) < 0 | max(y1,na.rm=T) > maxy | min(y1,na.rm=T) < 0 )
+	{
+		stop('Some trees are outside the plot boundaries. Consider fit.in.plot=T')
+	}
 	if ( round(w_grid) != w_grid | round(h_grid) != h_grid )
 	{
 		stop('Plot width and height must be divisible by grid_size');
-	}
-	
-	if ( max(X,na.rm=T) > maxx | min(X,na.rm=T) < 0 | max(Y,na.rm=T) > maxy | min(Y,na.rm=T) < 0 )
-	{
-		stop('Some trees are outside the plot boundaries')
 	}
 	
 	census$quad<-(ceiling((maxy-miny)/grid_size))*(floor((x1-minx)/grid_size))+(floor((y1-miny)/grid_size)+1)   ## identifiant de cellule unique 1->100 en partant de 0,0
