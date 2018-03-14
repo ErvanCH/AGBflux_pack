@@ -21,7 +21,7 @@ data.prep <- function(site,stem,taper.correction,fill.missing,use.palm.allometry
 	INDEX <- match(tolower(site),site.info$site)
 	if (is.na(INDEX)) {			stop("Site name should be one of the following: \n",paste(levels(factor(site.info$site)),collapse=" - ")) }
 	
-	if(missing(DATA_path)){
+	if(!exists("DATA_path")){
 		DATA_path <- paste0(path_folder,"/data/")
 	}
 	
@@ -47,8 +47,6 @@ data.prep <- function(site,stem,taper.correction,fill.missing,use.palm.allometry
 	df <- data.correction(df,taper.correction,fill.missing,stem)
 	print("Step 1: data correction done.")
 	
-	site="luquillo"
-	DATA_path <- NULL
 	df <- computeAGB(df,site,palm,DATA_path=NULL)
 	print("Step 2: AGB calculation done.")
 	
@@ -125,6 +123,7 @@ corDBH <- function(DT,taper.correction,fill.missing) {
 	hom2 <- DT[status1=="A",round(hom*100)/100]   # round hom to be at 1.3 meter (avoiding odd rounding)
 	loc <- which(is.na(dbh2))
 	DATE <- DT[status1=="A","date"][[1]]
+	hom2[is.na(hom2) & !is.na(dbh2)] <- 1.3
 	
 	# 1. Apply Cushman's correction to trees with POM changed
 	if (taper.correction & any(hom2 > 1.3,na.rm=T)) {
@@ -192,19 +191,19 @@ corDBH <- function(DT,taper.correction,fill.missing) {
 #' @return a data.table (data.frame) with all relevant variables.
 #' @export
 
-computeAGB <- function(df,site,use.palm.allometry=T,DATA_path=NULL) {
-	if(is.null(DATA_path)){
-		DATA_path <- paste0(path_folder,"/data/")
+computeAGB <- function(df,site,use.palm.allometry=T) {
+	if(!exists("DATA_path")){
+		DATA_path <<- paste0(path_folder,"/data/")
 	}
 	## Allocate wood density
-	df <- density.ind(df=df,site,wsg=WSG)
+	df <- density.ind(df,site,wsg=WSG)
 	
 	# Compute biomass
 	df$agb <- AGB.comp(site,df$dbh2, df$wsg,H = NULL)
 	
 	# Compute biomass for palms
 	if (use.palm.allometry) {
-		SP <-  LOAD(paste(DATA_path,list.files(DATA_path)[grep("spptable",list.files(DATA_path))],sep="/"))
+		SP <-  LOAD(paste0(DATA_path,list.files(DATA_path)[grep("spptable",list.files(DATA_path))]))
 		if(is.na(match("genus",tolower(names(SP))))) {
 			trim <- function (x) gsub("^\\s+|\\s+$", "", x)
 			SP$genus <-  trim(substr(SP$Latin,1,regexpr(" ",SP$Latin)))
@@ -491,7 +490,10 @@ normal.stat <-function(DT) {
 #' @return a data.table (data.frame) with all relevant variables.
 #' @export
 
-density.ind <- function (df, site, wsgdata, denscol = "wsg") {
+density.ind <- function (DF, site, wsgdata, denscol = "wsg") {
+	if(!exists("DATA_path")){
+		DATA_path <<- paste0(path_folder,"/data/")
+	}
 	#Add genus & species to data
 	SP <-  LOAD(paste(DATA_path,list.files(DATA_path)[grep("spptable",list.files(DATA_path))],sep="/"))
 	SP <- subset(SP,,c("sp","Genus","Species","Family"))
@@ -508,10 +510,19 @@ density.ind <- function (df, site, wsgdata, denscol = "wsg") {
 	A <- getWoodDensity(SP$Genus, SP$Species, stand = rep(site,nrow(SP)), family = NULL, region = "World",addWoodDensityData = wsg)
 	A$name <- paste(A$genus,A$species,sep=" ")
 	
-	SP <- merge(SP,A[,c("name","meanWD")],by="name",all.x=T)
+	SP <- unique(merge(SP,A[,c("name","meanWD")],by="name",all.x=T))
 	names(SP) <- c("name", "sp", "genus", "species", "Family", "wsg")
-	df <- merge(df,subset(SP,,c("sp","wsg")),by="sp",all.x=T)
-	return(df)
+	if (any(grep("name",names(DF)))) {
+		DT <- merge(DF,subset(SP,,c("name","wsg")),by="name",all.x=T)	
+	} else {
+		DT <- merge(DF,subset(SP,,c("sp","wsg")),by="sp",all.x=T)
+	}
+	# Allocate mean WD to species not in the list
+	if (any(is.na(DT$wsg))){
+	print(paste0("There are ",nrow(DT[is.na(wsg)])," individuals without WD values. Plot-average value (", round(mean(DT$wsg, na.rm=T),2),") was assigned."))
+	DT <- within(DT,wsg[is.na(wsg)] <- mean(wsg, na.rm=T))
+	}
+	return(DT)
 }
 
 #' AGB computation
@@ -623,9 +634,10 @@ assign.status2 <- function(DT) {
 create.quadrats=function(census,grid_size,x="gx",y="gy",fit.in.plot) {
 	X <- census[,grep(x,names(census)),with=F][[1]]
 	Y <- census[,grep(y,names(census)),with=F][[1]]
-	if (any(is.na(X))){
+	
+	if (any(is.na(X))|any(is.na(Y))) {
 		warning(paste(length(X[is.na(X)])," trees without coordinates were discarded."))
-		census <- census[!is.na(X),]
+		census <- census[!is.na(X) & !is.na(Y)]
 		X <- census[,grep(x,names(census)),with=F][[1]]
 		Y <- census[,grep(y,names(census)),with=F][[1]]
 	}
