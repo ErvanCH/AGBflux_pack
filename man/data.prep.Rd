@@ -4,9 +4,9 @@
 \alias{data.prep}
 \title{CTFS-formated data preparation}
 \usage{
-data.prep(site, stem, taper.correction, fill_missing, palm, strangler,
+data.prep(site, stem, taper.correction, fill.missing, palm, strangler,
   maxrel = 20, draw.graph, output.errors, DATA_path,
-  exclude.interval = exclude.interval)
+  exclude.interval = NULL)
 }
 \arguments{
 \item{site}{provide the full name of your site (in lower case) i.e. 'barro colorado island'}
@@ -15,7 +15,7 @@ data.prep(site, stem, taper.correction, fill_missing, palm, strangler,
 
 \item{taper.correction}{TRUE or FALSE, are you willing to apply Cushman et al (2014) taper correction?}
 
-\item{fill_missing}{TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?}
+\item{fill.missing}{TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?}
 
 \item{palm}{TRUE or FALSE, if TRUE, biomass of palm trees is computed through a specific allometric model (Goodman et al. 2013)}
 
@@ -29,7 +29,7 @@ data.prep(site, stem, taper.correction, fill_missing, palm, strangler,
 
 \item{DATA_path}{allows to provide a different path where the data are located}
 
-\item{exclude.interval}{a vector (i.e. c(1,2)) indicating if a set of census intervals must be discarded from computation due for instance to a change in  protocol of measurment}
+\item{exclude.interval}{NULL by default. If needed a vector (e.g. c(1,2)) indicating which census interval(s) must be discarded from computation due, for instance, to a change in  protocol of measurment}
 }
 \value{
 a data.table (data.frame) with all relevant variables.

@@ -10,7 +10,7 @@ normal.stat(X)
 \item{x}{a data.table}
 }
 \value{
-a data.table (data.frame) with all relevant variables.
+a data.table (data.frame) with a new colum "status1" where values can be "P"(prior),"A"(alive),"D"(dead) and "Dr"(dead replicated).
 }
 \description{
 Check the consistency of stem/tree status over time (i.e. a tree that is 'alive' at last census can not be 'dead' inbetween)

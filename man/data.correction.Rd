@@ -4,12 +4,14 @@
 \alias{data.correction}
 \title{Trim and correct data}
 \usage{
-data.correction(df, taper.correction, fill_missing)
+data.correction(df, taper.correction, fill.missing, stem)
 }
 \arguments{
 \item{taper.correction}{TRUE or FALSE, are you willing to apply Cushman et al (2014) taper correction?}
 
-\item{fill_missing}{TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?}
+\item{fill.missing}{TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?}
+
+\item{stem}{is the function applied over stem (stem=TRUE) or tree (stem=FALSE) data?}
 }
 \value{
 a data.table (data.frame) with all relevant variables.

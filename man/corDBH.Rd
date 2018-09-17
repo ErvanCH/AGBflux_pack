@@ -4,14 +4,14 @@
 \alias{corDBH}
 \title{Data correction}
 \usage{
-corDBH(DF, taper.correction, fill_missing)
+corDBH(DF, taper.correction, fill.missing)
 }
 \arguments{
 \item{DF}{a data.table}
 
 \item{taper.correction}{TRUE or FALSE, are you willing to apply Cushman et al (2014) taper correction?}
 
-\item{fill_missing}{TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?}
+\item{fill.missing}{TRUE or FALSE, are you willing to extrapolate missing DBH from surrounding DBH?}
 }
 \value{
 a data.table (data.frame) with all relevant variables.
