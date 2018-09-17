@@ -31,12 +31,16 @@ data.prep <- function(site,stem,taper.correction,fill.missing,use.palm.allometry
 	
 	
 	# Create the receiving data.frame
-	df <- data.frame("treeID"=NA, "stemID"=NA, "tag"=NA, "StemTag"=NA, "sp"=NA, "quadrat"=NA, "gx"=NA, "gy"=NA,"dbh"=NA,"hom"=NA, "ExactDate"=NA, "DFstatus"=NA, "codes"=NA, "date"=NA,"status"=NA,"agb"=NA,"CensusID"=NA,"year"=NA)
+	df <- data.frame("treeID"=NA, "stemID"=NA, "tag"=NA, "StemTag"=NA, "sp"=NA, "quadrat"=NA, "gx"=NA, "gy"=NA,"dbh"=NA,"hom"=NA, "ExactDate"=NA, "DFstatus"=NA, "codes"=NA, "date"=NA,"status"=NA,"CensusID"=NA,"year"=NA)
 	
 	for (i in 1:length(files)) {
 		temp <- setDT(LOAD(paste(DATA_path,files[i],sep="/")))
 		temp$CensusID <- i
 		temp[,year:= round(mean(as.numeric(format(as.Date(date, origin='1960-1-1'),'%Y')),na.rm=T))]
+		if(any(is.na(match(names(df),names(temp))))) {
+			ID <- which(is.na(match(names(df),names(temp))))
+			stop(paste0("The data must have a column named ",names(df)[ID],collapse=" - ")) 
+		}
 		temp  <- temp[,match(names(df),names(temp)),with=FALSE]
 		df <- rbind(df,temp)
 	}
@@ -356,8 +360,9 @@ flag.errors <- function(DF,site,flag.stranglers,maxrel,graph.problem.trees,outpu
 	if (flag.stranglers) {
 		DF <- within(DF,error.loss[ficus==1 & code=="D"] <- 1) # flag dead strangler figs	
 	}
-	ID <- DF[error!=0 & !code%in%c("D","R"),nrow(.SD)>1,by=treeID]
-	ID <- ID$treeID[ID$V1]
+	# ID <- DF[error!=0 & !code%in%c("D","R"),nrow(.SD)>=1,by=treeID]
+	# ID <- ID[V1==T,treeID]
+	ID <- unique(DF[error!=0,treeID])
 	if (length(ID)/12 > 10) {
 		A <- 	menu(c("Y", "N"), title="There are more than 144 trees (10 pages) to be printed. Do you want to print them?") 
 		ifelse(A==1,graph.problem.trees<-T,graph.problem.trees<-F)
@@ -373,27 +378,30 @@ flag.errors <- function(DF,site,flag.stranglers,maxrel,graph.problem.trees,outpu
 			i = i + 1
 			DF[,year:=as.numeric(year)]
 			DF$dbh1 <- round(DF$dbh1,1)
-			X <- DF[treeID==ID[n] & !code%in%c("R")][order(year)]
+			DF[,"y1":=year-round(int)]
+			aa <- ID[n]
+			X <- DF[treeID==aa & !code%in%c("R")][order(year)]
 			X$point <- 0
 			X$point[X$error!=0] <- 1
-			Y <- DF[treeID==ID[n] & !code%in%c("D","R")][order(year)]
-			YY <- Y[,.(year=max(year),name=unique(name),d2=round(dbhc2[year==max(year)],1),d02=round(dbh2[year==max(year)],1),hom2=round(hom2[year==max(year)],2)),by=treeID]
+			Y <- DF[treeID==aa & !code%in%c("D","R")][order(year)]
+			YY <- Y[,.(year=max(year),name=unique(name),d2=round(dbhc2[year==max(year)],1),d02=round(dbh2[year==max(year)],1),hom2=round(hom2[year==max(year)],2),y1=unique(y1)),by=treeID]
 			Y$line <- 0
 			Y$line[Y$dHOM==0] <- 1
 			Y$point <- 0
 			Y$point[Y$error!=0] <- 1
 			
-			GRAPH[[i]] = ggplot(X,aes(x=year,y=dbhc1)) + geom_point(size=2) + geom_segment(data=Y,aes(x=year,y=dbhc1,xend=year+5,yend=dbhc2,linetype=as.factor(line))) + geom_point(data=X[point==1],aes(x=year+5,y=dbhc2),col=2)	+ labs(title=paste0(unique(X$name)," (",ID[n],")"), x=" ",y="dbh (mm)") + geom_text(data=Y,aes(x=year,y=dbh1-(0.05*dbh1)),label=round(Y$hom1,2),cex=CX)	+ geom_text(data=YY,aes(x=year+5,y=d02-(0.05*d02)),label=round(YY$hom2,2),cex=CX) + geom_text(data=Y,aes(x=year,y=0.3*max(dbhc2)),label=Y$dbh1,cex=CX,angle=90,vjust=1) + geom_text(data=YY,aes(x=year+5,y=0.3*max(d2)),label=YY$d02,cex=CX,angle=90,vjust=1) + theme(plot.title = element_text(size=5*CX,face="bold"),axis.title.y= element_text(size=5*CX,,face="bold"),axis.text.y = element_text(size=4*CX),axis.text.x = element_text(size=4*CX,vjust=0,angle=30),panel.background = element_blank(),strip.text = element_text(size = 4*CX,face="bold"),strip.background = element_rect("lightgrey"),panel.spacing = unit(0.1, "lines")) + scale_linetype_manual(values=c('0'="dashed",'1'="solid")) + guides(linetype=F,colour=F) + scale_x_continuous(limits=c(min(as.numeric(YEAR))-3,max(as.numeric(YEAR))+3),breaks = as.numeric(YEAR)) + scale_y_continuous(limits=c(0.2*max(YY$d2),max(X$dbhc2,X$dbhc1)))
+			GRAPH[[i]] = ggplot(X,aes(x=y1,y=dbhc1)) + geom_point(size=2) + geom_segment(data=Y,aes(x=y1,y=dbhc1,xend=year,yend=dbhc2,linetype=as.factor(line))) + geom_point(data=X[point==1],aes(x=year,y=dbhc2),col=2)	+ labs(title=paste0(unique(X$name)," (",ID[n],")"), x=" ",y="dbh (mm)") + geom_text(data=Y,aes(x=y1,y=dbh1-(0.05*dbh1)),label=round(Y$hom1,2),cex=CX)	+ geom_text(data=YY,aes(x=year,y=d02-(0.05*d02)),label=round(YY$hom2,2),cex=CX) + geom_text(data=Y,aes(x=year,y=0.3*max(dbhc2)),label=Y$dbh1,cex=CX,angle=90,vjust=1) + geom_text(data=YY,aes(x=year,y=0.3*max(d2)),label=YY$d02,cex=CX,angle=90,vjust=1) + theme(plot.title = element_text(size=5*CX,face="bold"),axis.title.y= element_text(size=5*CX,,face="bold"),axis.text.y = element_text(size=4*CX),axis.text.x = element_text(size=4*CX,vjust=0,angle=30),panel.background = element_blank(),strip.text = element_text(size = 4*CX,face="bold"),strip.background = element_rect("lightgrey"),panel.spacing = unit(0.1, "lines")) + scale_linetype_manual(values=c('0'="dashed",'1'="solid")) + guides(linetype=F,colour=F) + scale_x_continuous(limits=c(min(as.numeric(YEAR))-3,max(as.numeric(YEAR))+3),breaks = as.numeric(YEAR)) + scale_y_continuous(limits=c(0.2*max(YY$d2),max(X$dbhc2,X$dbhc1)))
 			
 			
-			if (i %% 15 == 0) { ## print 8 plots on a page
+			if (i %% 15 == 0 | i<15) { ## print 8 plots on a page
 				a=a+1	
 				plot(do.call(grid.arrange,  GRAPH))
 				ggsave(do.call(grid.arrange,  GRAPH),file=paste0(path_folder,"/output/trees_with_major_errors_",a,".pdf"),width = 29.7, height = 20.1, units = "cm")
 				GRAPH = list() # reset plot
 				i = 0 # reset index
 			}}
-	} # end of graph 
+	
+		} # end of graph 
 	
 	if (length(ID)==0){ 
 		print(paste0("No tree productivity above",maxrel, "% or below",-maxrel,"% of mean productivity at your plot. You may eventually want to try a lower threshold.")) 
