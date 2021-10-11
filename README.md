@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
 # <img src="https://i.imgur.com/vTLlhbp.png" align="right" height=88 /> Compute biomass fluxes at ForestGEO sites
