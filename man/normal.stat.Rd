@@ -16,5 +16,5 @@ a data.table (data.frame) with a new colum "status1" where values can be "P"(pri
 Check the consistency of stem/tree status over time (i.e. a tree that is 'alive' at last census can not be 'dead' inbetween)
 }
 \author{
-Ervan Rutishauser (er.rutishauser@gmail.com)
+Ervan Rutishauser (ervan.rutishauser@infoflora.ch)
 }
