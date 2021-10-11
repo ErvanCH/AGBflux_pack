@@ -38,5 +38,5 @@ a data.table (data.frame) with all relevant variables.
 Main routine to format and correct CTFS-formated data
 }
 \author{
-Ervan Rutishauser (er.rutishauser@gmail.com)
+Ervan Rutishauser (ervan.rutishauser@infoflora.ch)
 }
