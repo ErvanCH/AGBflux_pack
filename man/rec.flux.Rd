@@ -22,5 +22,5 @@ absolute recruitment flux in % per year
 Compute unbiased recruitment rate (i.e. account for unmeasured recruitment)
 }
 \author{
-Helene Muller-Laudau (hmullerlandau@gmail.com )
+Helene Muller-Laudau (hmullerlandau@gmail.com)
 }
