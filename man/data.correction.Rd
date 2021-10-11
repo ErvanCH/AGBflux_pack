@@ -20,5 +20,5 @@ a data.table (data.frame) with all relevant variables.
 Stack all censuses together and correct DBH, if required
 }
 \author{
-Ervan Rutishauser (er.rutishauser@gmail.com)
+Ervan Rutishauser (ervan.rutishauser@infoflora.ch)
 }
