@@ -20,5 +20,5 @@ a smoothed prediction of the variable of interest
 a wrapper to get smoothed predictions of AGB fluxes using a loess function (library 'locfit')
 }
 \author{
-Ervan Rutishauser (er.rutishauser@gmail.com)
+Ervan Rutishauser (ervan.rutishauser@infoflora.ch)
 }
