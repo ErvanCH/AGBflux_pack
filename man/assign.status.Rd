@@ -16,5 +16,5 @@ update the column 'status1' with consistent information.
 Assign status alive ("A"), alive with POM changed ("AC"), dead ("D"), recruited ("R") or resprout ("Rsp") to trees, and check for consistency over time (i.e. avoid resurrection)
 }
 \author{
-Ervan Rutishauser (er.rutishauser@gmail.com)
+Ervan Rutishauser (ervan.rutishauser@infoflora.ch)
 }
