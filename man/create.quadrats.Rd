@@ -22,5 +22,5 @@ add three columns to the data.frame: quadrat's number, centroids X and Y.
 Creat a grid where all trees are allocated to a given quadrat of size (= grid size).
 }
 \author{
-Ervan Rutishauser (er.rutishauser@gmail.com)
+Ervan Rutishauser (ervan.rutishauser@infoflora.ch)
 }
